@@ -1,240 +1,106 @@
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_image.h>
-#include <stdio.h>
 #include <iostream>
 #include <vector>
+#include "sdl_utils.h"
 #include "timer.h"
-
-#define RAD2DEG     57.2957795130823208768  //!< to convert radians to degrees
-#define DEG2RAD     0.01745329251994329577  //!< to convert degrees to radians
-
-#define ROTATE_COSSIN_X(x, y, cos_angle, sin_angle) \
-  ((cos_angle) * (x) - (sin_angle) * (y))
-#define ROTATE_COSSIN_Y(x, y, cos_angle, sin_angle) \
-  ((sin_angle) * (x) + (cos_angle) * (y))
-#define ROTATE_ANGLE_X(x, y, angle) \
-  (ROTATE_COSSIN_X(x, y, cos(angle), sin(angle)) )
-#define ROTATE_ANGLE_Y(x, y, angle) \
-  (ROTATE_COSSIN_Y(x, y, cos(angle), sin(angle)) )
-
-inline SDL_Point SDL_Point_ctor(int x, int y) { SDL_Point p; p.x = x; p.y = y; return p; }
-inline SDL_Point operator + (const SDL_Point &a, const SDL_Point &b) {
-  return SDL_Point_ctor(a.x+b.x,a.y+b.y);
-}
-inline SDL_Point operator - (const SDL_Point &a) {
-  return SDL_Point_ctor(-a.x,-a.y);
-}
-inline SDL_Point operator - (const SDL_Point &a, const SDL_Point &b) {
-  return SDL_Point_ctor(a.x-b.x,a.y-b.y);
-}
-inline SDL_Point operator * (const double &k, const SDL_Point &a) {
-  return SDL_Point_ctor(k*a.x,k*a.y);
-}
-inline SDL_Point rotate(const SDL_Point &pt, double angle) {
-  double cosa = cos(angle), sina = sin(angle);
-  SDL_Point ans;
-  ans.x = ROTATE_COSSIN_X(pt.x, pt.y, cosa, sina);
-  ans.y = ROTATE_COSSIN_Y(pt.x, pt.y, cosa, sina);
-  return ans;
-}
-
-Uint32 getpixel(SDL_Surface *surface, int x, int y) {
-  int bpp = surface->format->BytesPerPixel;
-  /* Here p is the address to the pixel we want to retrieve */
-  Uint8 *p = (Uint8 *)surface->pixels + y * surface->pitch + x * bpp;
-  switch(bpp) {
-    case 1:
-      return *p;
-      break;
-
-    case 2:
-      return *(Uint16 *)p;
-      break;
-
-    case 3:
-      if(SDL_BYTEORDER == SDL_BIG_ENDIAN)
-        return p[0] << 16 | p[1] << 8 | p[2];
-      else
-        return p[0] | p[1] << 8 | p[2] << 16;
-      break;
-
-    case 4:
-      return *(Uint32 *)p;
-      break;
-
-    default:
-      return 0;       /* shouldn't happen, but avoids warnings */
-  }
-}
-
-void putpixel(SDL_Surface *surface, int x, int y, Uint32 pixel) {
-  int bpp = surface->format->BytesPerPixel;
-  /* Here p is the address to the pixel we want to set */
-  Uint8 *p = (Uint8 *)surface->pixels + y * surface->pitch + x * bpp;
-
-  switch(bpp) {
-    case 1:
-      *p = pixel;
-      break;
-
-    case 2:
-      *(Uint16 *)p = pixel;
-      break;
-
-    case 3:
-      if(SDL_BYTEORDER == SDL_BIG_ENDIAN) {
-        p[0] = (pixel >> 16) & 0xff;
-        p[1] = (pixel >> 8) & 0xff;
-        p[2] = pixel & 0xff;
-      } else {
-        p[0] = pixel & 0xff;
-        p[1] = (pixel >> 8) & 0xff;
-        p[2] = (pixel >> 16) & 0xff;
-      }
-      break;
-
-    case 4:
-      *(Uint32 *)p = pixel;
-      break;
-  }
-}
-
-void render_point(SDL_Renderer* renderer, SDL_Point p, int w,
-                  Uint8 r, Uint8 g, Uint8 b, Uint8 a = 255) {
-  SDL_Rect fillRect = { p.x-w/2, p.y-w/2, w, w };
-  SDL_SetRenderDrawColor( renderer, r, g, b, a );
-  SDL_RenderFillRect( renderer, &fillRect );
-  SDL_SetRenderDrawColor( renderer, 0, 0, 0, 255 );
-}
-
-// http://www.sdltutorials.com/sdl-scale-surface
-SDL_Surface *ScaleSurface(SDL_Surface *Surface, Uint16 Width, Uint16 Height)
-{
-  if(!Surface || !Width || !Height)
-    return 0;
-
-  SDL_Surface *_ret = SDL_CreateRGBSurface(Surface->flags, Width, Height, Surface->format->BitsPerPixel,
-                                           Surface->format->Rmask, Surface->format->Gmask, Surface->format->Bmask, Surface->format->Amask);
-
-  double    _stretch_factor_x = (static_cast<double>(Width)  / static_cast<double>(Surface->w)),
-      _stretch_factor_y = (static_cast<double>(Height) / static_cast<double>(Surface->h));
-
-  for(Sint32 y = 0; y < Surface->h; y++)
-    for(Sint32 x = 0; x < Surface->w; x++)
-      for(Sint32 o_y = 0; o_y < _stretch_factor_y; ++o_y)
-        for(Sint32 o_x = 0; o_x < _stretch_factor_x; ++o_x)
-          putpixel(_ret, static_cast<Sint32>(_stretch_factor_x * x) + o_x,
-                   static_cast<Sint32>(_stretch_factor_y * y) + o_y, getpixel(Surface, x, y));
-  return _ret;
-}
-
-
-class Texture {
-public:
-  Texture() { _tex = NULL; free(); }
-  ~Texture() { free(); }
-
-  void free() {
-    mWidth = 0;
-    mHeight = 0;
-    //Free texture if it exists
-    if( _tex == NULL )
-      return;
-    SDL_DestroyTexture( _tex );
-    _tex = NULL;
-  } // end free()
-
-  //////////////////////////////////////////////////////////////////////////////
-
-  inline int getWidth() const { return mWidth;}
-  inline int getHeight() const { return mHeight;}
-  inline SDL_Point center() const  { return SDL_Point_ctor(getWidth()/2, getHeight()/2); }
-
-  //////////////////////////////////////////////////////////////////////////////
-
-  bool load(SDL_Renderer* renderer, const std::string &str,
-            double scale = 1) {
-    // Load image as SDL_Surface
-    SDL_Surface* surface = IMG_Load( str.c_str() );
-
-    if (fabs(scale - 1) > 1E-2)
-      surface = ScaleSurface(surface, scale * surface->w, scale * surface->h);
-
-    // SDL_Surface is just the raw pixels
-    // Convert it to a hardware-optimzed texture so we can render it
-    _tex = SDL_CreateTextureFromSurface( renderer, surface );
-    if (_tex == NULL) {
-      printf("Could not load texture '%s':'%s'\n", str.c_str(), SDL_GetError());
-      return false;
-    }
-    //Get image dimensions
-    mWidth = surface->w;
-    mHeight = surface->h;
-
-    // Don't need the orignal texture, release the memory
-    SDL_FreeSurface( surface );
-    return true;
-  }// end load()
-
-  //////////////////////////////////////////////////////////////////////////////
-
-  bool render( SDL_Renderer* renderer, SDL_Point p, SDL_Rect* clip = NULL) {
-    //Set rendering space and render to screen
-    SDL_Rect renderQuad = { p.x, p.y, mWidth, mHeight };
-
-    //Set clip rendering dimensions
-    if( clip != NULL ) {
-      renderQuad.w = clip->w;
-      renderQuad.h = clip->h;
-    }
-
-    //Render to screen
-    return(SDL_RenderCopy( renderer, _tex, clip, &renderQuad ) == 0);
-  } // end render()
-
-  bool render_center( SDL_Renderer* renderer, SDL_Point p, SDL_Rect* clip = NULL) {
-    return render( renderer, p-this->center(), clip);
-  } // end render_center()
-
-  //////////////////////////////////////////////////////////////////////////////
-
-  bool render2( SDL_Renderer* renderer, SDL_Point p, SDL_Rect* clip,
-                double angle, SDL_Point* center = NULL, SDL_RendererFlip flip = SDL_FLIP_NONE) {
-    //Set rendering space and render to screen
-    SDL_Rect renderQuad = { p.x, p.y, mWidth, mHeight };
-
-    //Set clip rendering dimensions
-    if( clip != NULL ) {
-      renderQuad.w = clip->w;
-      renderQuad.h = clip->h;
-    }
-    //Render to screen
-    return (SDL_RenderCopyEx( renderer, _tex, clip, &renderQuad, angle * RAD2DEG, center, flip ) == 0);
-  } // end render()
-
-  bool render2_center( SDL_Renderer* renderer, SDL_Point p, SDL_Rect* clip,
-                       double angle, SDL_Point* center = NULL, SDL_RendererFlip flip = SDL_FLIP_NONE) {
-    return render2( renderer, p-this->center(), clip, angle, center, flip);
-  } // end render2_center()
-
-  //////////////////////////////////////////////////////////////////////////////
-
-private:
-  //The actual hardware texture
-  SDL_Texture* _tex;
-  //Image dimensions
-  int mWidth, mHeight;
-};
 
 ////////////////////////////////////////////////////////////////////////////////
 
-class CarDrawer {
+class Fish {
 public:
-  CarDrawer(SDL_Renderer* renderer,
+  Fish() {}
+
+  void load(SDL_Renderer* renderer,
+            const std::string & fish_filename,
+            double scale = 1) {
+    // load data
+    _fish_img.load(renderer, fish_filename, scale);
+    _angle = 0;
+    // set default values
+    move_fish(Point2d(0, 0));
+  } // end load()
+
+  //////////////////////////////////////////////////////////////////////////////
+
+  void move_fish(const Point2d & center) {
+    _center_worldpos = center;
+  }
+  void set_fish_speed(const double & speed) {
+    _speed = speed;
+  }
+  void increase_angle(const double & dangle) {
+    _angle += dangle;
+  }
+  void advance(const double & dist) {
+    move_fish(_center_worldpos + rotate(Point2d(dist, 0), _angle));
+  }
+  void move_fish_random_border(int w, int h) {
+    double x = 0, y = 0, angle  = 0;
+    int border = rand() % 4;
+    if (border == 0) { // left
+      x = -_fish_img.getWidth()+1;
+      y = rand() % h;
+      angle = -M_PI_2 + drand48() * M_PI;
+    }
+    else if (border == 1) { // up
+      x = rand() % w;
+      y = -_fish_img.getHeight()+1;
+      angle = -M_PI + drand48() * M_PI;
+    }
+    else if (border == 2) { // right
+      x = w + _fish_img.getWidth()-1;
+      y = rand() % h;
+      angle = M_PI_2 + drand48() * M_PI;
+    }
+    else if (border == 3) { // down
+      x = rand() % w;
+      y = h + _fish_img.getHeight()-1;
+      angle = drand48() * M_PI;
+    }
+    move_fish(Point2d(x, y));
+    increase_angle(angle);
+    set_fish_speed(100);
+  }
+
+  //////////////////////////////////////////////////////////////////////////////
+
+  void update(int w, int h) {
+    advance(_speed * _update_timer.getTimeSeconds());
+    move_fish_if_gone(w, h);
+    _update_timer.reset();
+  }
+  void render(SDL_Renderer* renderer) {
+    _fish_img.render2_center(renderer, _center_worldpos, NULL, _angle);
+  }
+
+protected:
+  void move_fish_if_gone(int w, int h) {
+    if (_center_worldpos.x >= -_fish_img.getWidth()
+        && _center_worldpos.x <= w+_fish_img.getWidth()
+        && _center_worldpos.y >= -_fish_img.getHeight()
+        && _center_worldpos.y <= h+_fish_img.getHeight())
+      return;
+    printf("move_fish_if_gone():%s\n",_center_worldpos.to_string().c_str());
+    move_fish_random_border(w, h);
+  }
+
+  Timer _update_timer;
+  Point2d _center_worldpos;
+  double _angle;
+  double _speed;
+  Texture _fish_img;
+}; // end class fish
+
+////////////////////////////////////////////////////////////////////////////////
+
+class Car {
+public:
+  Car() {}
+
+  void load(SDL_Renderer* renderer,
             const std::string & car_filename,
-            const SDL_Point & front_wheel_center,
+            const Point2d & front_wheel_center,
             const std::string & front_wheel_filename,
-            const SDL_Point & back_wheel_center,
+            const Point2d & back_wheel_center,
             const std::string & back_wheel_filename,
             double scale = 1) {
     // load data
@@ -246,12 +112,12 @@ public:
     _carangle = 0;
     _front_wheel_center_offset = scale * front_wheel_center;
     _back_wheel_center_offset = scale * back_wheel_center;
-    set_car_center(SDL_Point_ctor(0, 0));
-  }
+    set_car_center(Point2d(0, 0));
+  } // end load()
 
   //////////////////////////////////////////////////////////////////////////////
 
-  void set_car_center(const SDL_Point & p) {
+  void set_car_center(const Point2d & p) {
     _car_center_worldpos = p;
     update_wheel_centers();
   }
@@ -263,13 +129,16 @@ public:
     update_wheel_centers();
   }
   void advance(const double & dist) {
-    set_car_center(_car_center_worldpos + rotate(SDL_Point_ctor(dist, 0), _carangle));
+    set_car_center(_car_center_worldpos + rotate(Point2d(dist, 0), _carangle));
   }
-  void rotate_wheels(const double & angspeed) {
-    _wheelangle += angspeed;
-    update_wheel_centers();
+  void set_wheel_angspeed(const double & wheel_angspeed) {
+    _wheel_angspeed = wheel_angspeed;
   }
   //////////////////////////////////////////////////////////////////////////////
+  void update() {
+    _wheelangle += _wheel_angspeed * _update_timer.getTimeSeconds();
+    _update_timer.reset();
+  }
 
   void render(SDL_Renderer* renderer) {
     //_car_img.render_center(renderer, _car_center_worldpos);
@@ -286,15 +155,16 @@ protected:
         + rotate(_back_wheel_center_offset-_car_img.center(), _carangle);
   }
   // car stuff
-  SDL_Point _car_center_worldpos;
+  Timer _update_timer;
+  Point2d _car_center_worldpos;
   double _carangle;
   // wheel stuff
-  double _wheelangle;
+  double _wheelangle, _wheel_angspeed;
   Texture _car_img, _front_wheel_img, _back_wheel_img;
-  SDL_Point _front_wheel_center_offset, _back_wheel_center_offset;
-  SDL_Point _front_wheel_center_worldpos, _back_wheel_center_worldpos;
-  // in image coordinates
-}; // end class CarDrawer
+  Point2d _front_wheel_center_offset, _back_wheel_center_offset;
+  // in world coordinates
+  Point2d _front_wheel_center_worldpos, _back_wheel_center_worldpos;
+}; // end class Car
 
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
@@ -304,17 +174,23 @@ public:
 
   Game() {}
   //protected:
-  struct Car {
-    CarDrawer _drawer;
-    double _speed;
-    int _center_worldposition;
-  };
 
-  void draw_cars() {
-    //_track._img.copyTo(_final_output);
+  void update(int w, int h) {
+    for (unsigned int i = 0; i < _cars.size(); ++i)
+      _cars[i].update();
+    for (unsigned int i = 0; i < _fishes.size(); ++i)
+      _fishes[i].update(w, h);
+  }
+
+  void render(SDL_Renderer* renderer) {
+    for (unsigned int i = 0; i < _cars.size(); ++i)
+      _cars[i].render(renderer);
+    for (unsigned int i = 0; i < _fishes.size(); ++i)
+      _fishes[i].render(renderer);
   }
 
   std::vector<Car> _cars;
+  std::vector<Fish> _fishes;
   //Track _track;
   Texture _final_output;
 }; // end Game
@@ -323,6 +199,8 @@ public:
 ////////////////////////////////////////////////////////////////////////////////
 
 int main(int argc, char**argv) {
+  srand(time(NULL));
+  srand48(time(NULL));
   if ( SDL_Init( SDL_INIT_EVERYTHING ) == -1 ) {
     std::cout << " Failed to initialize SDL : " << SDL_GetError() << std::endl;
     return false;
@@ -348,21 +226,37 @@ int main(int argc, char**argv) {
   }
   // Set size of renderer to the same as window
   SDL_RenderSetLogicalSize( renderer, windowRect.w, windowRect.h );
-  // Set color of renderer to red
+  // Set color of renderer to grey
   SDL_SetRenderDrawColor( renderer, 50, 50, 50, 255 );
 
-  CarDrawer car1(renderer, "../models/arnaud.png",
-                 SDL_Point_ctor(1165, 501), "../models/arnaud_front_wheel.png",
-                 SDL_Point_ctor(182, 494), "../models/arnaud_back_wheel.png",
-                 .2);
-  CarDrawer car2(renderer, "../models/unai.png",
-                 SDL_Point_ctor(1211, 502), "../models/unai_front_wheel.png",
-                 SDL_Point_ctor(182, 513), "../models/unai_back_wheel.png",
-                 .2);
-  car1.set_car_center(SDL_Point_ctor(200, 200));
-  car2.set_car_center(SDL_Point_ctor(200, 400));
+  Game game;
+  game._cars.resize(2);
+  Car* car1 = &(game._cars[0]);
+  Car* car2 = &(game._cars[1]);
+  car1->load(renderer, "../models/arnaud.png",
+             Point2d(1165, 501), "../models/arnaud_front_wheel.png",
+             Point2d(182, 494), "../models/arnaud_back_wheel.png",
+             .2);
+  car2->load(renderer, "../models/unai.png",
+             Point2d(1211, 502), "../models/unai_front_wheel.png",
+             Point2d(182, 513), "../models/unai_back_wheel.png",
+             .2);
+  car1->set_car_center(Point2d(200, 200));
+  car2->set_car_center(Point2d(200, 400));
+  unsigned int nfishes = 30;
+  game._fishes.resize(nfishes);
+  for (unsigned int var = 0; var < nfishes; ++var) {
+    Fish* fish = &(game._fishes[var]);
+    double size = .05 + drand48() * .3;
+    std::ostringstream filename;
+    filename << "../models/fish/pez"<< 1+rand()%8 << ".png";
+    fish->load(renderer, filename.str(), size);
+    fish->move_fish_random_border(windowRect.w, windowRect.h);
+  }
 
-  double ang_speed = .3;
+  double ang_speed = 2.;
+  car1->set_wheel_angspeed(ang_speed);
+  car2->set_wheel_angspeed(ang_speed);
   bool loop = true;
   Rate rate(20);
   //Start counting frames per second
@@ -373,29 +267,31 @@ int main(int argc, char**argv) {
         loop = false;
       else if ( event.type == SDL_KEYDOWN ) {
         SDL_Keycode key = event.key.keysym.sym;
-        if (key == SDLK_PLUS || key == SDLK_KP_PLUS)
-          ang_speed = std::min(ang_speed + .05, 1.);
-        else if (key == SDLK_MINUS || key == SDLK_KP_MINUS)
-          ang_speed = std::max(ang_speed - .05, .01);
+        if (key == SDLK_PLUS || key == SDLK_KP_PLUS) {
+          ang_speed = std::min(ang_speed + .2, 10.);
+          car1->set_wheel_angspeed(ang_speed);
+          car2->set_wheel_angspeed(ang_speed);
+        }
+        else if (key == SDLK_MINUS || key == SDLK_KP_MINUS) {
+          ang_speed = std::max(ang_speed - .2, .01);
+          car1->set_wheel_angspeed(ang_speed);
+          car2->set_wheel_angspeed(ang_speed);
+        }
         else if (key == SDLK_UP)
-          car1.advance(10);
+          car1->advance(10);
         else if (key == SDLK_DOWN)
-          car1.advance(-10);
+          car1->advance(-10);
         else if (key == SDLK_LEFT)
-          car1.increase_angle(.1);
+          car1->increase_angle(.1);
         else if (key == SDLK_RIGHT)
-          car1.increase_angle(-.1);
+          car1->increase_angle(-.1);
       } // end while ( SDL_PollEvent( &event ) )
     } // end while(event)
-    car1.rotate_wheels(ang_speed);
-    car2.rotate_wheels(ang_speed);
+    game.update(windowRect.w, windowRect.h);
 
     SDL_RenderClear( renderer );
-    car1.render(renderer);
-    car2.render(renderer);
+    game.render(renderer);
     SDL_RenderPresent( renderer);
-    // Add a 16msec delay to make our game run at ~60 fps
-    //SDL_Delay( 50 );
     rate.sleep();
   } // end while (true)
   // clean
