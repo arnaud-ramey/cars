@@ -10,7 +10,6 @@ find_package(SDL2 REQUIRED)
 include_directories(${SDL2_INCLUDE_DIR})
 FIND_PACKAGE(OpenCV REQUIRED )
 
-ADD_EXECUTABLE(cars cars.cpp
-                    image_contour.h voronoi.h timer.h debug.h)
+ADD_EXECUTABLE(cars cars.cpp timer.h)
 TARGET_LINK_LIBRARIES(cars ${OpenCV_LIBS} ${SDL2_LIBRARY} SDL2_image)
 
