@@ -2,8 +2,69 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <stdio.h>
 
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_image.h>
+
 #define RAD2DEG     57.2957795130823208768  //!< to convert radians to degrees
 #define DEG2RAD     0.01745329251994329577  //!< to convert degrees to radians
+
+class Texture {
+  Texture() { _tex = NULL; }
+  ~Texture() { free(); }
+
+  void free() {
+    //Free texture if it exists
+    if( _tex == NULL )
+      return;
+      SDL_DestroyTexture( _tex );
+      _tex = NULL;
+      mWidth = 0;
+      mHeight = 0;
+  } // end free()
+
+  bool load(const std::string &str, SDL_Renderer* renderer) {
+    // Load image as SDL_Surface
+    SDL_Surface* surface = IMG_Load( str.c_str() );
+
+    // SDL_Surface is just the raw pixels
+    // Convert it to a hardware-optimzed texture so we can render it
+    _tex = SDL_CreateTextureFromSurface( renderer, surface );
+    if (_tex == NULL) {
+      printf("Could not load texture '%s':'%s'\n", str.c_str(), SDL_GetError());
+      return false;
+    }
+    //Get image dimensions
+    mWidth = surface->w;
+    mHeight = surface->h;
+
+    // Don't need the orignal texture, release the memory
+    SDL_FreeSurface( surface );
+    return true;
+  }// end load()
+
+  bool render( SDL_Renderer* renderer, int x, int y, SDL_Rect* clip ) {
+    //Set rendering space and render to screen
+    SDL_Rect renderQuad = { x, y, mWidth, mHeight };
+
+    //Set clip rendering dimensions
+    if( clip != NULL ) {
+      renderQuad.w = clip->w;
+      renderQuad.h = clip->h;
+    }
+
+    //Render to screen
+    SDL_RenderCopy( renderer, _tex, clip, &renderQuad );
+  } // end render()
+
+  inline int getWidth() { return mWidth;}
+  inline int getHeight() { return mHeight;}
+
+private:
+  //The actual hardware texture
+  SDL_Texture* _tex;
+  //Image dimensions
+  int mWidth, mHeight;
+};
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -102,9 +163,7 @@ inline void paste_img_compute_rois(const Image & topaste, const Image & dst,
 template<class Image>
 inline void paste_img(const Image & topaste, Image & dst,
                       int topaste_x, int topaste_y,
-                      const cv::Mat* mask = NULL,
-                      const std::string title = "",
-                      const cv::Scalar title_color = cv::Scalar(0, 0, 255)) {
+                      const cv::Mat* mask = NULL) {
   //  printf("paste_img()\n");
 
   cv::Rect topaste_roi, dst_roi;
@@ -131,12 +190,6 @@ inline void paste_img(const Image & topaste, Image & dst,
   }
   else
     topaste_sub.copyTo(dst_sub);
-
-  // put the title if needed
-  if (title != "")
-    cv::putText(dst, title,
-                cv::Point(dst_roi.x + 5, dst_roi.y + dst_roi.height - 10),
-                cv::FONT_HERSHEY_PLAIN, 1, title_color);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -161,65 +214,48 @@ inline void rotate_image(const cv::Mat & src, cv::Mat & dst,
                          int borderMode=cv::BORDER_CONSTANT,
                          const cv::Scalar& borderValue=cv::Scalar()) {
   cv::Mat rot_mat = cv::getRotationMatrix2D
-                    (rotation_center, angle_rad * RAD2DEG, 1.0);
+      (rotation_center, angle_rad * RAD2DEG, 1.0);
   cv::warpAffine(src, dst, rot_mat, src.size(), flags, borderMode, borderValue);
 } // end rotate_image();
 
 ////////////////////////////////////////////////////////////////////////////////
 
-inline void color_negmask(const cv::Mat3b & img, const cv::Scalar color,
-                          cv::Mat1b & mask) {
-  unsigned int rows = img.rows, cols = img.cols;
-  mask.create(img.size());
-  mask.setTo(0);
-  cv::Vec3b color3b(color[0], color[1], color[2]);
-  for (unsigned int row = 0; row < rows; ++row) {
-    const cv::Vec3b*row_ptr = img.ptr<cv::Vec3b>(row);
-    uchar* mask_buffer_ptr = mask.ptr<uchar>(row);
-    for (unsigned int col = 0; col < cols; ++col) {
-      if (row_ptr[col] != color3b)
-        mask_buffer_ptr[col] = 255;
-    } // end loop col
-  } // end loop row
-} // end color_negmask();
+//! read a PNG file with transparency
+//! http://docs.opencv.org/2.4/modules/core/doc/operations_on_arrays.html?highlight=mixchannels#mixchannels
+inline bool file2bgra(const std::string & filename,
+                      cv::Mat3b & bgr,
+                      cv::Mat1b & alpha) {
+  cv::Mat img = cv::imread(filename, cv::IMREAD_UNCHANGED);
+  if (img.channels() != 4) {
+    printf("File '%s' does not have four layers!\n", filename.c_str());
+    return false;
+  }
+  bgr.create(img.size());
+  alpha.create(img.size());
+  int from_to1[] = { 0,0, 1,1, 2,2 };
+  cv::mixChannels(&img, 1, &bgr, 1, from_to1, 3);
+  int from_to2[] = { 3,0 };
+  cv::mixChannels(&img, 1, &alpha, 1, from_to2, 1);
+  return true;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 
 class CarDrawer {
 public:
-  CarDrawer(const cv::Mat3b & img,
-      const cv::Point & front_wheel_center,
-      const int & front_wheel_radius_px,
-      const cv::Point & back_wheel_center,
-      const int & back_wheel_radius_px) {
-    img.copyTo(_car_img);
-    cv::Scalar lodiff = cv::Scalar::all(0), updiff = cv::Scalar::all(20);
-    cv::floodFill(_car_img, cv::Point(0, 0),                   cv::Scalar::all(0), 0, lodiff, updiff);
-    cv::floodFill(_car_img, cv::Point(0, _car_img.rows-1),          cv::Scalar::all(0), 0, lodiff, updiff);
-    cv::floodFill(_car_img, cv::Point(_car_img.cols-1, _car_img.rows-1), cv::Scalar::all(0), 0, lodiff, updiff);
-    cv::floodFill(_car_img, cv::Point(_car_img.cols-1, 0),          cv::Scalar::all(0), 0, lodiff, updiff);
-    color_negmask(_car_img, cv::Scalar::all(0), _car_mask);
-
+  CarDrawer(const std::string & car_filename,
+            const cv::Point & front_wheel_center,
+            const std::string & front_wheel_filename,
+            const cv::Point & back_wheel_center,
+            const std::string & back_wheel_filename) {
+    file2bgra(car_filename, _car_img, _car_mask);
 
     _front_wheel_center = front_wheel_center;
-    _front_wheel_img.create(2*front_wheel_radius_px, 2*front_wheel_radius_px);
-    _front_wheel_img.setTo(cv::Scalar::all(0));
-    cv::Mat1b img_mask(img.size(), (uchar) 0);
-    cv::circle(img_mask, front_wheel_center, front_wheel_radius_px, CV_RGB(255, 255, 255), -1);
-    paste_img(img, _front_wheel_img, -front_wheel_center.x + front_wheel_radius_px,
-              -front_wheel_center.y + front_wheel_radius_px, &img_mask);
-    color_negmask(_front_wheel_img, cv::Scalar::all(0), _front_wheel_mask);
+    file2bgra(front_wheel_filename, _front_wheel_img, _front_wheel_mask);
 
     _back_wheel_center = back_wheel_center;
-    _back_wheel_img.create(2*back_wheel_radius_px, 2*back_wheel_radius_px);
-    _back_wheel_img.setTo(cv::Scalar::all(0));
-    img_mask.setTo(0);
-    cv::circle(img_mask, back_wheel_center, back_wheel_radius_px, CV_RGB(255, 255, 255), -1);
-    paste_img(img, _back_wheel_img, -back_wheel_center.x + back_wheel_radius_px,
-              -back_wheel_center.y + back_wheel_radius_px, &img_mask);
-    color_negmask(_back_wheel_img, cv::Scalar::all(0), _back_wheel_mask);
-
+    file2bgra(back_wheel_filename, _back_wheel_img, _back_wheel_mask);
     //  cv::imshow("car", _car);
     //  cv::imshow("front_wheel_img", _front_wheel_img);
     //  cv::imshow("back_wheel_img", _back_wheel_img);
@@ -230,7 +266,7 @@ public:
 
   //////////////////////////////////////////////////////////////////////////////
 
-  inline cv::Point img_center(const cv::Mat & m) {
+  static inline cv::Point img_center(const cv::Mat & m) {
     return cv::Point(m.cols/2, m.rows/2);
   }
 
@@ -257,10 +293,9 @@ protected:
 
 class Track{
 public:
-  Track(const cv::Mat3b & track) {
-    track.copyTo(_img);
+  Track(const std::string & track_filename) {
     cv::Mat1b track_mask;
-    color_negmask(track, cv::Scalar::all(255), track_mask);
+    file2bgra(track_filename, _img, track_mask);
     std::vector<std::vector<cv::Point> > contours;
     cv::findContours(track_mask, contours, // a vector of contours
                      CV_RETR_EXTERNAL, // retrieve the external contours
@@ -273,7 +308,7 @@ public:
       printf("Track creation failed!\n");
       return;
     }
-    _track_size = track.size();
+    _track_size = _img.size();
     _points = contours.front();
     _npts = _points.size();
     //  cv::Mat1b illus(_track_size, (uchar) 0);
@@ -298,9 +333,20 @@ public:
             const double & angle_rad, const cv::Point & rotation_center,
             int topaste_x, int topaste_y,
             const cv::Mat* mask = NULL) {
-    //paste_img()
-        //rotate_image();
+    //rotate_image(const cv::Mat & src, cv::Mat & dst,
+    //                         const double & angle_rad, const cv::Point & rotation_center,
+    //                         int flags=cv::INTER_LINEAR,
+    //                         int borderMode=cv::BORDER_CONSTANT,
+    //                         const cv::Scalar& borderValue=cv::Scalar())
+    rotate_image(topaste, buffer, angle_rad, rotation_center);
+    //    paste_img(const Image & topaste, Image & dst,
+    //              int topaste_x, int topaste_y,
+    //              const cv::Mat* mask = NULL,
+    //              const std::string title = "",
+    //              const cv::Scalar title_color = cv::Scalar(0, 0, 255))
+    paste_img(buffer, dst, topaste_x, topaste_y, mask);
   }
+  cv::Mat buffer;
 }; // end CopyRotater
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -310,7 +356,7 @@ class Game {
 public:
 
   Game() {}
-//protected:
+  //protected:
   struct Car {
     CarDrawer _drawer;
     double _speed;
@@ -330,12 +376,12 @@ public:
 ////////////////////////////////////////////////////////////////////////////////
 
 int main(int argc, char**argv) {
-  CarDrawer car1(cv::imread("../models/DSC_0780.png", CV_LOAD_IMAGE_COLOR),
-           cv::Point(1211, 502), 129,
-           cv::Point(182, 513), 126);
-  CarDrawer car2(cv::imread("../models/DSC_0781.png", CV_LOAD_IMAGE_COLOR),
-           cv::Point(1165, 501), 119,
-           cv::Point(182, 494), 130);
+  CarDrawer car1("../models/unai.png",
+                 cv::Point(1211, 502), "../models/unai_front_wheel.png",
+                 cv::Point(182, 513), "../models/unai_back_wheel.png");
+  CarDrawer car2("../models/DSC_0781.png",
+                 cv::Point(1165, 501), "../models/arnaud_front_wheel.png",
+                 cv::Point(182, 494), "../models/arnaud_back_wheel.png");
 #if 1
   cv::Mat3b out1, out2, out1_resized, out2_resized;
   double angle = 0, ang_speed = .1;
@@ -348,7 +394,7 @@ int main(int argc, char**argv) {
 
     cv::imshow("out1", out1_resized);
     cv::imshow("out2", out2_resized);
-    char c = cv::waitKey(10);
+    char c = cv::waitKey(50);
     if (c == '+') {
       ang_speed = std::min(ang_speed + .05, 1.);
     }
@@ -358,7 +404,7 @@ int main(int argc, char**argv) {
     angle -= ang_speed;
   } // end while (true)
 #else
-  Track track(cv::imread("../models/track.png", CV_LOAD_IMAGE_COLOR));
+  Track track("../models/track.png");
 #endif
   return 0;
 }
