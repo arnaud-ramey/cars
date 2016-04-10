@@ -30,7 +30,10 @@ ________________________________________________________________________________
 #include <SDL2/SDL2_gfxPrimitives.h>
 #include "timer.h"
 #include <sstream>
+#include <vector>
 
+#define DEBUG_PRINT(...)   {}
+//#define DEBUG_PRINT(...)   printf(__VA_ARGS__)
 #define RAD2DEG     57.2957795130823208768  //!< to convert radians to degrees
 #define DEG2RAD     0.01745329251994329577  //!< to convert degrees to radians
 
@@ -151,6 +154,85 @@ inline Point2d rotate(const Point2d &pt, double angle) {
   return ans;
 }
 
+/*!
+ * \brief   detect if a point is inside a polygon - return true or false
+ *  http://en.wikipedia.org/wiki/Point_in_polygon#Winding_number_algorithm
+     *
+ * \param   p the point
+ * \param   poly the polygon
+ * \return  true if the point is in the polygon
+ */
+static inline bool point_inside_polygon(const Point2d & p,
+                                        const std::vector<Point2d> & poly) {
+  /*
+     * algo from http://www.visibone.com/inpoly/
+     */
+  Point2d p_old, p_new, p1, p2;
+  bool inside = false;
+  int npoints = poly.size();
+  if (npoints < 3) {
+    return false;
+  }
+  p_old = poly[npoints-1];
+  for (int i=0 ; i < npoints ; i++) {
+    p_new = poly[i];
+    if (p_new.x > p_old.x) {
+      p1 = p_old;
+      p2 = p_new;
+    }
+    else {
+      p1 = p_new;
+      p2 = p_old;
+    }
+    if ((p_new.x < p.x) == (p.x <= p_old.x)          /* edge "open" at one end */
+        && 1.f * (p.y-p1.y) * (p2.x-p1.x) < 1.f * (p2.y-p1.y) * (p.x-p1.x)) {
+      inside = !inside;
+    }
+    p_old.x = p_new.x;
+    p_old.y = p_new.y;
+  } // end loop i
+  return(inside);
+}
+
+/// Checks if the two polygons are intersecting.
+bool IsPolygonsIntersecting(std::vector<Point2d> A, std::vector<Point2d> B,
+                            bool reverse_already_checked = false)
+{
+  for (int i1 = 0; i1 < A.size(); i1++) {
+    int i2 = (i1 + 1) % A.size();
+    Point2d p1 = A[i1], p2 = A[i2];
+
+    Point2d normal(p2.y - p1.y, p1.x - p2.x);
+
+    double UNDEF = 1E9;
+    double minA = UNDEF, maxA = UNDEF;
+    for (unsigned int i = 0; i < A.size(); ++i) {
+      Point2d p = A[i];
+      double projected = normal.x * p.x + normal.y * p.y;
+      if (minA == UNDEF || projected < minA)
+        minA = projected;
+      if (maxA == UNDEF || projected > maxA)
+        maxA = projected;
+    }
+
+    double minB = UNDEF, maxB = UNDEF;
+    for (unsigned int i = 0; i < B.size(); ++i) {
+      Point2d p = B[i];
+      double projected = normal.x * p.x + normal.y * p.y;
+      if (minB == UNDEF || projected < minB)
+        minB = projected;
+      if (maxB == UNDEF || projected > maxB)
+        maxB = projected;
+    }
+
+    if (maxA < minB || maxB < minA)
+      return false;
+  }
+  if (!reverse_already_checked)
+    return true;
+  return IsPolygonsIntersecting(B, A, false);
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 
 // https://www.libsdl.org/release/SDL-1.2.15/docs/html/guidevideo.html
@@ -241,55 +323,65 @@ SDL_Surface *ScaleSurface(SDL_Surface *Surface, Uint16 Width, Uint16 Height)
 
 class Texture {
 public:
-  Texture() { _sdltex = NULL; mWidth = 0; mHeight = 0; }
+  Texture() { _sdltex = NULL; _sdlsurface = NULL; _width =  _height = 0; _resize_scale = 1; }
   ~Texture() { free(); }
 
   void free() {
-    if( _sdltex == NULL )
+    if(!_width)
       return;
-    printf("Texture::free(%ix%i)\n", mWidth, mHeight);
-    mWidth = 0;
-    mHeight = 0;
+    printf("Texture::free(%ix%i)\n", _width, _height);
+    _width =  _height = 0;
+    _resize_scale = 1;
     //Free texture if it exists
-    SDL_DestroyTexture( _sdltex );
+    if (_sdltex)
+      SDL_DestroyTexture( _sdltex );
+    if (_sdlsurface)
+      SDL_FreeSurface( _sdlsurface );
     _sdltex = NULL;
   } // end free()
 
   //////////////////////////////////////////////////////////////////////////////
 
-  inline int getWidth() const { return mWidth;}
-  inline int getHeight() const { return mHeight;}
-  inline Point2d center() const  { return Point2d(getWidth()/2, getHeight()/2); }
-  inline Point2i centeri() const  { return Point2i(getWidth()/2, getHeight()/2); }
+  inline int get_width() const { return _width;}
+  inline int get_height() const { return _height;}
+  inline double get_resize_scale() const { return _resize_scale;}
+  inline Point2d center() const  { return Point2d(get_width()/2, get_height()/2); }
 
   //////////////////////////////////////////////////////////////////////////////
 
   bool from_file(SDL_Renderer* renderer, const std::string &str,
-                 double scale = 1) {
+                 int goalwidth = -1, int goalheight = -1, double goalscale = -1) {
+    printf("Texture::from_file('%s'), goal:(%i, %i, %g)\n", str.c_str(), goalwidth, goalheight, goalscale);
     free();
     // Load image as SDL_Surface
-    SDL_Surface* surface = IMG_Load( str.c_str() );
-    if( surface == NULL ) {
+    _sdlsurface = IMG_Load( str.c_str() );
+    if( _sdlsurface == NULL ) {
       printf( "Unable to load image %s! SDL Error: %s\n", str.c_str(), SDL_GetError() );
       return false;
     }
 
-    if (fabs(scale - 1) > 1E-2)
-      surface = ScaleSurface(surface, scale * surface->w, scale * surface->h);
+    if (goalwidth <= 0 && goalheight <= 0 && goalscale <= 0)
+      _resize_scale = 1;
+    else {
+      double scalex =  (goalwidth > 0 ? 1. * goalwidth / _sdlsurface->w : 1E6);
+      double scaley =  (goalheight > 0 ? 1. * goalheight / _sdlsurface->h : 1E6);
+      double scalescale =  (goalscale > 0 ? goalscale : 1E6);
+      _resize_scale = std::min(scalescale, std::min(scalex, scaley));
+      SDL_Surface* surface_scaled = ScaleSurface(_sdlsurface, _resize_scale * _sdlsurface->w, _resize_scale * _sdlsurface->h);
+      SDL_FreeSurface( _sdlsurface );
+      _sdlsurface = surface_scaled;
+    }
 
     // SDL_Surface is just the raw pixels
     // Convert it to a hardware-optimzed texture so we can render it
-    _sdltex = SDL_CreateTextureFromSurface( renderer, surface );
+    _sdltex = SDL_CreateTextureFromSurface( renderer, _sdlsurface );
     if (_sdltex == NULL) {
       printf("Could not load texture '%s':'%s'\n", str.c_str(), SDL_GetError());
       return false;
     }
     //Get image dimensions
-    mWidth = surface->w;
-    mHeight = surface->h;
-
-    // Don't need the orignal texture, release the memory
-    SDL_FreeSurface( surface );
+    _width = _sdlsurface->w;
+    _height = _sdlsurface->h;
     return true;
   }// end load()
 
@@ -299,7 +391,7 @@ public:
                double angle_rad = 0, Point2d center = Point2d(-1, -1),
                SDL_RendererFlip flip = SDL_FLIP_NONE) {
     //Set rendering space and render to screen
-    SDL_Rect renderQuad = { p.x, p.y, scale * mWidth, scale * mHeight };
+    SDL_Rect renderQuad = { p.x, p.y, scale * _width, scale * _height };
 
     //Set clip rendering dimensions
     if( clip != NULL ) {
@@ -307,12 +399,19 @@ public:
       renderQuad.h = scale * clip->h;
     }
     //Render to screen
-    if (flip == SDL_FLIP_NONE && fabs(angle_rad) < 1E-2)
-      return(SDL_RenderCopy( renderer, _sdltex, clip, &renderQuad ) == 0);
+    if (flip == SDL_FLIP_NONE && fabs(angle_rad) < 1E-2) {
+      bool ok = (SDL_RenderCopy( renderer, _sdltex, clip, &renderQuad ) == 0);
+      if (!ok)
+        printf("SDL_RenderCopy() returned an error '%s'!\n", SDL_GetError());
+      return ok;
+    }
 
     SDL_Point psdl = p.to_sdl();
     SDL_Point* psdl_ptr = (center.x < 0 && center.y < 0 ? NULL : &psdl);
-    return (SDL_RenderCopyEx( renderer, _sdltex, clip, &renderQuad, angle_rad * RAD2DEG, psdl_ptr, flip ) == 0);
+    bool ok = (SDL_RenderCopyEx( renderer, _sdltex, clip, &renderQuad, angle_rad * RAD2DEG, psdl_ptr, flip ) == 0);
+    if (!ok)
+      printf("SDL_RenderCopyEx() returned an error '%s'!\n", SDL_GetError());
+    return ok;
   } // end render()
 
   inline bool render_center( SDL_Renderer* renderer, Point2d p, double scale = 1, SDL_Rect* clip = NULL,
@@ -326,8 +425,10 @@ public:
 private:
   //The actual hardware texture
   SDL_Texture* _sdltex;
+  SDL_Surface* _sdlsurface;
   //Image dimensions
-  int mWidth, mHeight;
+  int _width, _height;
+  double _resize_scale;
 }; // end Texture
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -354,6 +455,26 @@ bool render_line(SDL_Renderer* renderer, Point2d pt1, Point2d pt2,
   }
   SDL_SetRenderDrawColor( renderer, r0, g0, b0, a0 );
   return true;
+}
+
+bool render_polygon(SDL_Renderer* renderer, const std::vector<Point2d> & poly,
+                 Uint8 r, Uint8 g, Uint8 b, Uint8 a = 255, int thickness=1) {
+  unsigned int npts = poly.size();
+  bool ok = true;
+  for (unsigned int i = 0; i < npts-1; ++i)
+    ok = ok && render_line(renderer, poly[i], poly[i+1], r, g, b, a, thickness);
+  ok = ok && render_line(renderer, poly[0], poly[npts-1], r, g, b, a, thickness);
+  return ok;
+}
+
+bool render_rect(SDL_Renderer* renderer, const SDL_Rect & rect,
+                 Uint8 r, Uint8 g, Uint8 b, Uint8 a = 255, int thickness=1) {
+  std::vector<Point2d> pts;
+  pts.push_back(Point2d(rect.x, rect.y));
+  pts.push_back(Point2d(rect.x, rect.y+rect.h));
+  pts.push_back(Point2d(rect.x+rect.w, rect.y+rect.h));
+  pts.push_back(Point2d(rect.x+rect.w, rect.y));
+  return render_polygon(renderer, pts, r, g, b, a, thickness);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -424,18 +545,26 @@ protected:
   Timer _life_timer, _update_timer;
   Point2d _position, _accel, _speed;
   double _angle, _radius;
-};
+}; // end class OrientedObject
+
+////////////////////////////////////////////////////////////////////////////////
 
 class OrientedTexture : public OrientedObject {
 public:
-  void load(SDL_Renderer* renderer,
-            const std::string & filename,
-            double scale = 1) {
+  bool from_file(SDL_Renderer* renderer,
+                 const std::string & filename,
+                 int goalwidth = -1, int goalheight = -1, double goalscale = -1) {
     // load data
-    _tex.from_file(renderer, filename, scale);
-    _radius = hypot(_tex.getWidth(), _tex.getHeight()) / 2;
-    // set default values
-  } // end load()
+    if (!_tex.from_file(renderer, filename, goalwidth, goalheight, goalscale))
+      return false;
+    _radius = hypot(_tex.get_width(), _tex.get_height()) / 2;
+    _bbox_offset.resize(4);
+    _bbox_offset[0] = Point2d(0, 0);
+    _bbox_offset[1] = Point2d(0, _tex.get_height());
+    _bbox_offset[2] = Point2d(_tex.get_width(), _tex.get_height()/2);
+    _bbox_offset[3] = Point2d(_tex.get_width(), 0);
+    return true;
+  } // end from_file()
 
   bool render(SDL_Renderer* renderer) {
     if (!_tex.render_center(renderer, _position, 1, NULL, _angle))
@@ -443,6 +572,11 @@ public:
     //render_point(renderer, _position, 3, 255, 0, 0, 255);
     render_arrow(renderer, _position, _position + _speed, 255, 0, 0, 255, 3);
     render_arrow(renderer, _position, _position + _accel, 0, 255, 0, 255, 2);
+    SDL_Rect rb;
+    rough_bbox(rb);
+    render_rect(renderer, rb, 255, 0, 0, 255, 5);
+//    compute_tight_bbox(_bbox);
+//    render_polygon(renderer, _bbox, 255, 0, 0, 255, 5);
     return true;
   }
 
@@ -450,9 +584,40 @@ public:
     return _position + rotate(p - _tex.center(), _angle);
   }
 
+  inline bool bbox_contains_point(const Point2d & p) {
+    return (point_inside_polygon(p, _bbox_offset));
+  }
+
+  inline void rough_bbox(SDL_Rect & bbox) const {
+    bbox.x = _position.x - _radius;
+    bbox.y = _position.y - _radius;
+    bbox.w = 2 * _radius;
+    bbox.h = 2 * _radius;
+  }
+  inline void compute_tight_bbox(std::vector<Point2d> & tight_bbox) const {
+    tight_bbox.resize(4);
+    for (unsigned int i = 0; i < _bbox_offset.size(); ++i)
+      tight_bbox[i] == offset2world_pos(_bbox_offset[i]);
+  }
+
+  inline bool collides_with(const OrientedTexture & b) const {
+    // rough radius check
+    if ((_position-b._position).norm() > _radius + b._radius)
+      return false;
+    // tight bbox check
+    std::vector<Point2d> aP, bP;
+    compute_tight_bbox(aP);
+    b.compute_tight_bbox(bP);
+    if (!IsPolygonsIntersecting(aP, bP))
+      return false;
+    // http://www.sdltutorials.com/sdl-per-pixel-collision
+    return true;
+  }
+
   //protected:
   Texture _tex;
-}; // end class OrientedObject
+  std::vector<Point2d> _bbox_offset, _bbox;
+}; // end class OrientedTexture
 
 #endif // SDL_UTILS_H
 
