@@ -1,7 +1,7 @@
 PROJECT(cars)
 cmake_minimum_required(VERSION 2.6)
 #set(CMAKE_BUILD_TYPE RelWithDebInfo)
-set(CMAKE_BUILD_TYPE RelWithDebInfo)
+set(CMAKE_BUILD_TYPE Debug)
 SET(CMAKE_VERBOSE_MAKEFILE OFF)
 
 # includes cmake/FindSDL2.cmake

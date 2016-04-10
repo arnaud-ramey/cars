@@ -39,7 +39,8 @@ public:
 
   double sleep() {
     double time_left = _period_sec - _timer.getTimeSeconds();
-    usleep(1E6 * time_left);
+    if (time_left > 1E-3) // 1 ms
+      usleep(1E6 * time_left);
     _timer.reset();
   }
 

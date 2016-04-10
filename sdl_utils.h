@@ -194,19 +194,25 @@ static inline bool point_inside_polygon(const Point2d & p,
   return(inside);
 }
 
-/// Checks if the two polygons are intersecting.
-bool IsPolygonsIntersecting(std::vector<Point2d> A, std::vector<Point2d> B,
-                            bool reverse_already_checked = false)
-{
-  for (int i1 = 0; i1 < A.size(); i1++) {
-    int i2 = (i1 + 1) % A.size();
-    Point2d p1 = A[i1], p2 = A[i2];
+////////////////////////////////////////////////////////////////////////////////
 
+/*! Checks if the two polygons are intersecting.
+ * \param reverse_already_checked
+ *  the function is internally made of 2 subcalls.
+ *  DO NOT set this parameter to true.
+ */
+bool IsPolygonsIntersecting(const std::vector<Point2d> & A,
+                            const std::vector<Point2d> & B,
+                            bool reverse_already_checked = false) {
+  unsigned int sA =A.size(), sB = B.size();
+  for (int i1 = 0; i1 <sA; i1++) {
+    int i2 = (i1 + 1) %sA;
+    Point2d p1 = A[i1], p2 = A[i2];
     Point2d normal(p2.y - p1.y, p1.x - p2.x);
 
     double UNDEF = 1E9;
     double minA = UNDEF, maxA = UNDEF;
-    for (unsigned int i = 0; i < A.size(); ++i) {
+    for (unsigned int i = 0; i <sA; ++i) {
       Point2d p = A[i];
       double projected = normal.x * p.x + normal.y * p.y;
       if (minA == UNDEF || projected < minA)
@@ -216,7 +222,7 @@ bool IsPolygonsIntersecting(std::vector<Point2d> A, std::vector<Point2d> B,
     }
 
     double minB = UNDEF, maxB = UNDEF;
-    for (unsigned int i = 0; i < B.size(); ++i) {
+    for (unsigned int i = 0; i < sB; ++i) {
       Point2d p = B[i];
       double projected = normal.x * p.x + normal.y * p.y;
       if (minB == UNDEF || projected < minB)
@@ -422,6 +428,18 @@ public:
 
   //////////////////////////////////////////////////////////////////////////////
 
+  // http://www.sdltutorials.com/sdl-per-pixel-collision
+  //! \return alpha in [0, 255], or < 0 if out of bounds
+  inline int get_alpha(const Point2d & p) {
+    if (p.x < 0 || p.x >= get_width()
+        || p.y < 0 || p.y >= get_height())
+      return -1;
+    Uint8 red, green, blue, alpha;
+    SDL_GetRGBA(getpixel(_sdlsurface, p.x, p.y),
+                _sdlsurface->format, &red, &green, &blue, &alpha);
+    return alpha;
+  }
+
 private:
   //The actual hardware texture
   SDL_Texture* _sdltex;
@@ -443,13 +461,21 @@ void render_point(SDL_Renderer* renderer, Point2d p, int thickness,
   SDL_SetRenderDrawColor( renderer, r0, g0, b0, a0 );
 }
 
+//! \caution CPU costs are much higher if \arg thickness > 1
 bool render_line(SDL_Renderer* renderer, Point2d pt1, Point2d pt2,
                  Uint8 r, Uint8 g, Uint8 b, Uint8 a = 255, int thickness=1) {
   Uint8 r0, g0, b0, a0; // get original colors of the renderer
   SDL_GetRenderDrawColor( renderer, &r0, &g0, &b0, &a0 );
   // https://stackoverflow.com/questions/21560384/how-to-specify-width-or-point-size-in-sdl-2-0-draw-points-lines-or-rect
+  if (thickness == 1) {
+    SDL_SetRenderDrawColor( renderer, r, g, b, a );
+    if (SDL_RenderDrawLine(renderer, pt1.x, pt1.y, pt2.x, pt2.y) != 0) {
+      printf("SDL_RenderDrawLine() returned an error!\n");
+      return false;
+    }
+  }
   // http://www.ferzkopp.net/Software/SDL2_gfx/Docs/html/_s_d_l2__gfx_primitives_8h.html#a247136a562abec2649718d38f5819b44
-  if (thickLineRGBA(renderer, pt1.x, pt1.y, pt2.x, pt2.y, thickness, r, g, b, a) != 0) {
+  else if (thickLineRGBA(renderer, pt1.x, pt1.y, pt2.x, pt2.y, thickness, r, g, b, a) != 0) {
     printf("thickLineRGBA() returned an error!\n");
     return false;
   }
@@ -457,9 +483,12 @@ bool render_line(SDL_Renderer* renderer, Point2d pt1, Point2d pt2,
   return true;
 }
 
+//! \caution CPU costs are much higher if \arg thickness > 1
 bool render_polygon(SDL_Renderer* renderer, const std::vector<Point2d> & poly,
-                 Uint8 r, Uint8 g, Uint8 b, Uint8 a = 255, int thickness=1) {
+                    Uint8 r, Uint8 g, Uint8 b, Uint8 a = 255, int thickness=1) {
   unsigned int npts = poly.size();
+  if (npts == 0)
+    return true;
   bool ok = true;
   for (unsigned int i = 0; i < npts-1; ++i)
     ok = ok && render_line(renderer, poly[i], poly[i+1], r, g, b, a, thickness);
@@ -467,6 +496,7 @@ bool render_polygon(SDL_Renderer* renderer, const std::vector<Point2d> & poly,
   return ok;
 }
 
+//! \caution CPU costs are much higher if \arg thickness > 1
 bool render_rect(SDL_Renderer* renderer, const SDL_Rect & rect,
                  Uint8 r, Uint8 g, Uint8 b, Uint8 a = 255, int thickness=1) {
   std::vector<Point2d> pts;
@@ -479,8 +509,9 @@ bool render_rect(SDL_Renderer* renderer, const SDL_Rect & rect,
 
 ////////////////////////////////////////////////////////////////////////////////
 
+//! \caution CPU costs are much higher if \arg thickness > 1
 inline bool render_arrow
-(SDL_Renderer* renderer, Point2d pt1, Point2d pt2,
+(SDL_Renderer* renderer, const Point2d & pt1, const Point2d & pt2,
  Uint8 r, Uint8 g, Uint8 b, Uint8 a = 255, int thickness=1) {
   // draw the body of the arrow
   if (!render_line(renderer, pt1, pt2, r, g, b, a, thickness))
@@ -507,6 +538,7 @@ class OrientedObject {
 public:
   OrientedObject() {
     _radius =  _angle = 0;
+    _compute_tight_bbox_needed = true;
     set_position(Point2d(0, 0));
   }
 
@@ -519,9 +551,15 @@ public:
   void renorm_speed(const double & newnorm)     { _speed.renorm(newnorm); }
   Point2d get_speed() const                     { return  _speed; }
   void set_tan_nor_speed(const Point2d & speed) { _speed = rotate(speed, _angle); }
-  void set_position(const Point2d & position)   { _position = position; }
+  void set_position(const Point2d & position)   {
+    _compute_tight_bbox_needed = true;
+    _position = position;
+  }
   Point2d get_position() const                  { return  _position; }
-  void increase_angle(const double & dangle)    { _angle += dangle; }
+  void increase_angle(const double & dangle)    {
+    _compute_tight_bbox_needed = true;
+    _angle += dangle;
+  }
   void advance(const double & dist) {
     set_position(_position + rotate(Point2d(dist, 0), _angle));
   }
@@ -529,6 +567,7 @@ public:
     Timer::Time time = _update_timer.getTimeSeconds();
     _speed += time * _accel;
     _position += time * _speed;
+    _compute_tight_bbox_needed = true;
     _update_timer.reset();
   }
   void set_radius(const double & radius)         { _radius = radius; }
@@ -545,6 +584,7 @@ protected:
   Timer _life_timer, _update_timer;
   Point2d _position, _accel, _speed;
   double _angle, _radius;
+  bool _compute_tight_bbox_needed;
 }; // end class OrientedObject
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -561,7 +601,7 @@ public:
     _bbox_offset.resize(4);
     _bbox_offset[0] = Point2d(0, 0);
     _bbox_offset[1] = Point2d(0, _tex.get_height());
-    _bbox_offset[2] = Point2d(_tex.get_width(), _tex.get_height()/2);
+    _bbox_offset[2] = Point2d(_tex.get_width(), _tex.get_height());
     _bbox_offset[3] = Point2d(_tex.get_width(), 0);
     return true;
   } // end from_file()
@@ -570,22 +610,21 @@ public:
     if (!_tex.render_center(renderer, _position, 1, NULL, _angle))
       return false;
     //render_point(renderer, _position, 3, 255, 0, 0, 255);
-    render_arrow(renderer, _position, _position + _speed, 255, 0, 0, 255, 3);
-    render_arrow(renderer, _position, _position + _accel, 0, 255, 0, 255, 2);
+    render_arrow(renderer, _position, _position + _speed, 255, 0, 0, 255);
+    render_arrow(renderer, _position, _position + _accel, 0, 255, 0, 255);
     SDL_Rect rb;
     rough_bbox(rb);
-    render_rect(renderer, rb, 255, 0, 0, 255, 5);
-//    compute_tight_bbox(_bbox);
-//    render_polygon(renderer, _bbox, 255, 0, 0, 255, 5);
+    render_rect(renderer, rb, 200, 0, 0, 255);
+    render_polygon(renderer, get_tight_bbox(), 0, 255, 0, 255);
+    //render_point(renderer, _collision_pt, 5, 255, 255, 0);
     return true;
   }
 
   inline Point2d offset2world_pos(const Point2d & p) const {
     return _position + rotate(p - _tex.center(), _angle);
   }
-
-  inline bool bbox_contains_point(const Point2d & p) {
-    return (point_inside_polygon(p, _bbox_offset));
+  inline Point2d world_pos2offset(const Point2d & p) const {
+    return _tex.center() + rotate(p - _position, -_angle);
   }
 
   inline void rough_bbox(SDL_Rect & bbox) const {
@@ -594,29 +633,63 @@ public:
     bbox.w = 2 * _radius;
     bbox.h = 2 * _radius;
   }
-  inline void compute_tight_bbox(std::vector<Point2d> & tight_bbox) const {
-    tight_bbox.resize(4);
+  inline void compute_tight_bbox_if_needed() {
+    if (!_compute_tight_bbox_needed)
+      return;
+    _compute_tight_bbox_needed = false;
+    _tight_bbox.resize(4);
     for (unsigned int i = 0; i < _bbox_offset.size(); ++i)
-      tight_bbox[i] == offset2world_pos(_bbox_offset[i]);
+      _tight_bbox[i] = offset2world_pos(_bbox_offset[i]);
   }
 
-  inline bool collides_with(const OrientedTexture & b) const {
+  inline bool collides_with(OrientedTexture & other,
+                            int minalpha = 1) {
     // rough radius check
-    if ((_position-b._position).norm() > _radius + b._radius)
+    if ((_position-other._position).norm() > _radius + other._radius)
       return false;
     // tight bbox check
-    std::vector<Point2d> aP, bP;
-    compute_tight_bbox(aP);
-    b.compute_tight_bbox(bP);
-    if (!IsPolygonsIntersecting(aP, bP))
+    if (!IsPolygonsIntersecting(get_tight_bbox(), other.get_tight_bbox()))
       return false;
     // http://www.sdltutorials.com/sdl-per-pixel-collision
-    return true;
+    // compute rectangle intersection between both rough bboxes
+    SDL_Rect aB, bB, inter;
+    rough_bbox(aB);
+    other.rough_bbox(bB);
+    SDL_IntersectRect(&aB, &bB, &inter);
+    // for each point of the intersect, check if it can be a collision pt
+    std::vector<Point2d> aT = get_tight_bbox(), bT = get_tight_bbox();
+    for (int x = 0; x < inter.w; ++x) {
+      _collision_pt.x = inter.x + x;
+      for (int y = 0; y < inter.h; ++y) {
+        _collision_pt.y = inter.y + y;
+        // first check the test pt belongs to the tight bbox
+        if (!point_inside_polygon(_collision_pt, aT)
+            || !point_inside_polygon(_collision_pt, bT))
+          continue;
+        // transform test point in picture frame
+        Point2d PA = world_pos2offset(_collision_pt);
+        // check alpha
+        if (_tex.get_alpha(PA) < minalpha)
+          continue;
+        Point2d PB = other.world_pos2offset(_collision_pt);
+        if (other._tex.get_alpha(PB) < minalpha)
+          continue;
+        // matching pixel found
+        return true;
+      } // end loop y
+    } // end loop x
+    _collision_pt = Point2d(-1, -1);
+    return false; // no matching pixel found
   }
 
-  //protected:
+protected:
+  inline std::vector<Point2d> & get_tight_bbox() {
+    compute_tight_bbox_if_needed();
+    return _tight_bbox;
+  }
   Texture _tex;
-  std::vector<Point2d> _bbox_offset, _bbox;
+  Point2d _collision_pt;
+  std::vector<Point2d> _bbox_offset, _tight_bbox;
 }; // end class OrientedTexture
 
 #endif // SDL_UTILS_H

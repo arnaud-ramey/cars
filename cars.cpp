@@ -217,11 +217,12 @@ public:
 
 class Game {
 public:
-  bool init() {
+  bool init(unsigned int winw, unsigned int winh) {
     unsigned int nfishes = 15;
     unsigned int car_width = 200; // px
     unsigned int candy_width = 100; // px
-    winw = 1200, winh  = 600; // pixels
+    _winw = winw;
+    _winh  = winh; // pixels
 
     srand(time(NULL));
     srand48(time(NULL));
@@ -235,8 +236,8 @@ public:
       printf( "SDL_image could not initialize! SDL_image Error: %s\n", IMG_GetError() );
     }
     // create window
-    SDL_Rect windowRect = { 10, 10, winw, winh};
-    window = SDL_CreateWindow( "Server", windowRect.x, windowRect.y, winw, winh, 0 );
+    SDL_Rect windowRect = { 10, 10, _winw, _winh};
+    window = SDL_CreateWindow( "Server", windowRect.x, windowRect.y, _winw, _winh, 0 );
     if ( window == NULL ) {
       std::cout << "Failed to create window : " << SDL_GetError();
       return false;
@@ -248,7 +249,7 @@ public:
       return false;
     }
     // Set size of renderer to the same as window
-    SDL_RenderSetLogicalSize( renderer, winw, winh );
+    SDL_RenderSetLogicalSize( renderer, _winw, _winh );
     // Set color of renderer to light blue
     SDL_SetRenderDrawColor( renderer, 150, 150, 255, 255 );
     //Check for joysticks
@@ -266,9 +267,11 @@ public:
     // init bubble manager
     _bubble_man.from_file(renderer, model_path + "bubble.png");
     for (unsigned int i = 0; i < 10; ++i)
-      _bubble_man.create_bubble(Point2d(rand()% winw, rand() % winh), 10 + rand()%100);
+      _bubble_man.create_bubble(Point2d(rand()% _winw, rand() % _winh), 10 + rand()%100);
     // init candy
     _candy_man.add_file(renderer, model_path + "fish/chuche1.png", candy_width);
+    //_candy_man.add_file(renderer, model_path + "fish/chuche2.png", candy_width);
+    //_candy_man.add_file(renderer, model_path + "fish/huevo.png", candy_width);
     // init cars
     _cars.resize(2);
     if (!_cars[0].from_file(renderer, model_path + "arnaud.png",
@@ -292,7 +295,7 @@ public:
       std::ostringstream filename;
       filename << model_path + "fish/pez"<< 1+rand()%8 << ".png";
       fish->from_file(renderer, filename.str(), fish_size);
-      fish->move_random_border(winw, winh);
+      fish->move_random_border(_winw, _winh);
     }
     return true;
   } // end init()
@@ -351,15 +354,16 @@ public:
     } // end while ( SDL_PollEvent( &event ) )
     // update all subcomponents
     for (unsigned int i = 0; i < _cars.size(); ++i)
-      _cars[i].update(winw, winh, &_bubble_man);
+      _cars[i].update(_winw, _winh, &_bubble_man);
     for (unsigned int i = 0; i < _fishes.size(); ++i)
-      _fishes[i].update(winw, winh);
-    bool ok = _candy_man.update(winw, winh);
-    _bubble_man.update(winw, winh);
+      _fishes[i].update(_winw, _winh);
+    bool ok = _candy_man.update(_winw, _winh);
+    _bubble_man.update(_winw, _winh);
     // check candy touched by car
     for (unsigned int i = 0; i < _cars.size(); ++i) {
-      if (_cars[i].collides_with(*(_candy_man._curr_candy))) {
+      if (_cars[i].collides_with(*(_candy_man._curr_candy), 80)) {
         printf("Collision car %i %g!\n", i, _candy_man._curr_candy->get_life_timer());
+        _candy_man.respawn(_winw, _winh);
       }
     }
     return ok;
@@ -388,7 +392,7 @@ protected:
   SDL_Window* window;
   SDL_Renderer* renderer;
   std::vector<SDL_Joystick*> gameControllers;
-  int winw, winh;
+  int _winw, _winh;
   CandyManager _candy_man;
   std::vector<Car> _cars;
   std::vector<Fish> _fishes;
@@ -400,7 +404,7 @@ protected:
 
 int main() {
   Game game;
-  if (!game.init())
+  if (!game.init(800, 500))
     return false;
   Rate rate(20);
   while (true) {
