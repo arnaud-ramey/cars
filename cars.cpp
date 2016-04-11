@@ -1,5 +1,15 @@
 #include <iostream>
+#include <algorithm>
 #include "sdl_utils.h"
+
+
+enum GameStatus {
+  GAME_STATUS_WAITING   = 0, // waiting for robots or joypads
+  GAME_STATUS_COUNTDOWN = 1, // countdown + lakitu
+  GAME_STATUS_RACE      = 2, // race time
+  GAME_STATUS_RACE_OVER = 3, // players cant move anymore
+  NGAME_STATUES         = 4
+};
 
 class Fish : public Entity {
 public:
@@ -146,8 +156,8 @@ public:
     }
   }
 
+  int rank;
 protected:
-  // wheel stuff
   Point2d _exhaust_pipe_offset;
 }; // end class Car
 
@@ -167,6 +177,8 @@ public:
     return true;
   }
 
+  void move_far_away() { set_position(Point2d(-_entity_radius, -_entity_radius)); }
+
   bool respawn(int winw, int winh, std::vector<Car> & cars){
     if (_candy_textures.empty()) {
       printf("Cannot respawn candy without texture!\n");
@@ -177,18 +189,25 @@ public:
     set_texture(_candy_textures[_tex_idx]);
     Point2d old_pos = get_position();
     for (int tryidx = 0; tryidx < 100; ++tryidx) {
+      bool ok = true;
+      // new random position
       set_position(Point2d(.1 * winw + rand() % (int) (.8 * winw),
                            .1 * winh + rand() % (int) (.8 * winh)));
+      // check far from previous
       if ((get_position() - old_pos).norm() < winw / 3)
         continue;
+      // check far from players
       for (int i = 0; i < cars.size(); ++i) {
-        if ((get_position() - cars[i].get_position()).norm() < winw / 3)
-          continue;
-      }
-      break;
+        if ((get_position() - cars[i].get_position()).norm() >= winw / 3)
+          continue; // far enough from player i
+        ok = false;
+        break;
+      } // end for i
+      if (ok)
+        break;
     } // end tryidx
     return true;
-  }
+  } // end respawn()
 
   bool update(int winw, int winh, std::vector<Car> & cars) {
     if (get_position().x <= 0)
@@ -206,9 +225,13 @@ public:
 
 class Game {
 public:
+  static const double GAME_LENGTH = 15; // seconds
+  static const double COUNTDOWN_LENGTH = 5; // seconds
+
   bool init(unsigned int winw, unsigned int winh) {
+    _game_status = GAME_STATUS_WAITING;
     unsigned int nfishes = 15;
-    unsigned int nplayers = 2;
+    _nplayers = 2;
     _winw = winw;
     _winh  = winh; // pixels
 
@@ -222,6 +245,11 @@ public:
     int imgFlags = IMG_INIT_PNG;
     if( !( IMG_Init( imgFlags ) & imgFlags ) ) {
       printf( "SDL_image could not initialize! SDL_image Error: %s\n", IMG_GetError() );
+      return false;
+    }
+    //Initialize SDL_mixer
+    if( Mix_OpenAudio( 44100, MIX_DEFAULT_FORMAT, 2, 2048 ) < 0 ) {
+      printf( "SDL_mixer could not initialize! SDL_mixer Error: %s\n", Mix_GetError() );
       return false;
     }
     //Initialize SDL_ttf
@@ -256,20 +284,50 @@ public:
         DEBUG_PRINT( "Joystick %i connected\n", i);
     }
 
+    ///
+    /// load data
+    ///
     std::string base_path = SDL_GetBasePath(),
         data_path = base_path + "../data/",
         graphics_path = data_path + "graphics/";
     DEBUG_PRINT("base_path:'%s'\n", base_path.c_str());
-    //Open the font
-    _font = TTF_OpenFont( (data_path + "fonts/LCD2U___.TTF").c_str(), 40 );
-    if( _font == NULL ) {
+    //Open the score font
+    _score_font = TTF_OpenFont( (data_path + "fonts/LCD2U___.TTF").c_str(), 40 );
+    if( _score_font == NULL ) {
       printf( "Failed to load font! SDL_ttf Error: %s\n", TTF_GetError() );
       return false;
     }
-    _score_textures.resize(nplayers);
-    _scores.resize(nplayers);
-    for (int i = 0; i < nplayers; ++i)
-      _score_textures[i].loadFromRenderedText(renderer, _font, "0", 255, 0, 0);
+    // create scores
+    _score_textures.resize(_nplayers);
+    _scores.resize(_nplayers);
+    //Open the time font
+    _time_font = TTF_OpenFont( (data_path + "fonts/LCD2U___.TTF").c_str(), 80 );
+    if( _time_font == NULL ) {
+      printf( "Failed to load font! SDL_ttf Error: %s\n", TTF_GetError() );
+      return false;
+    }
+    std::ostringstream GAME_LENGTH_str; GAME_LENGTH_str << GAME_LENGTH;
+    _last_renderer_time = -1;
+    // load music and sounds
+    // WAVE, MOD, MIDI, OGG, MP3, FLAC
+    // sox cocoa_river.ogg -r 22050 cocoa_river.wav
+    _music = Mix_LoadMUS( (data_path + "music/cocoa_river.ogg").c_str() );
+    if( _music == NULL ) {
+      printf( "Failed to load music! SDL_mixer Error: %s\n", Mix_GetError() );
+      return false;
+    }
+    if (! (_grab_collectable_sfx    = Mix_LoadWAV((data_path + "sounds/grab_collectable.ogg").c_str()))
+        || ! (_last_lap_fanfare_sfx = Mix_LoadWAV((data_path + "sounds/last_lap_fanfare.ogg").c_str()))
+        || ! (_pre_start_race_sfx   = Mix_LoadWAV((data_path + "sounds/pre_start_race.ogg").c_str()))
+        || ! (_race_finish_sfx      = Mix_LoadWAV((data_path + "sounds/race_finish.ogg").c_str()))
+        || ! (_start_race_sfx       = Mix_LoadWAV((data_path + "sounds/start_race.ogg").c_str()))
+        || ! (_track_intro_sfx      = Mix_LoadWAV((data_path + "sounds/track_intro.ogg").c_str()))
+        ) {
+      printf( "Failed to load music! SDL_mixer Error: %s\n", Mix_GetError() );
+      return false;
+    }
+    Mix_VolumeMusic(128);
+    Mix_PlayChannel( -1, _track_intro_sfx, 0 );
     // init bubble manager
     _bubble_tex.from_file(renderer, graphics_path + "bubble.png", 50);
     _bubble_man.set_texture(&_bubble_tex);
@@ -285,8 +343,12 @@ public:
       candy_texture_ptrs.push_back(&_candy_textures[i]);
     _candy.set_textures(candy_texture_ptrs);
     // init cars
-    unsigned int car_width = 200; // px
-    _car_textures.resize(6);
+    unsigned int car_width = 200, cup_width = 64; // px
+    _cup_textures.resize(3);
+    _cup_textures[0].from_file(renderer, graphics_path + "cup_gold.png", cup_width);
+    _cup_textures[1].from_file(renderer, graphics_path + "cup_silver.png", cup_width);
+    _cup_textures[2].from_file(renderer, graphics_path + "cup_bronze.png", cup_width);
+    _car_textures.resize(7);
     _car_textures[0].from_file(renderer, graphics_path + "cars/arnaud.png", car_width);
     _car_textures[1].from_file(renderer, graphics_path + "cars/arnaud_front_wheel.png",
                                -1, -1, _car_textures[0].get_resize_scale());
@@ -297,18 +359,27 @@ public:
                                -1, -1, _car_textures[3].get_resize_scale());
     _car_textures[5].from_file(renderer, graphics_path + "cars/unai_back_wheel.png",
                                -1, -1, _car_textures[3].get_resize_scale());
-    _cars.resize(nplayers);
-    if (!_cars[0].set_textures(&_car_textures[0],
-                               Point2d(1165, 501), &_car_textures[1],
-                               Point2d(182, 494), &_car_textures[2],
-                               Point2d(9, 469))
-        || !_cars[1].set_textures(&_car_textures[3],
-                                  Point2d(1211, 502), &_car_textures[4],
-                                  Point2d(182, 513), &_car_textures[5],
-                                  Point2d(7, 484)))
-      return false;
-    _cars[0].set_position(Point2d(200, 200));
-    _cars[1].set_position(Point2d(200, 400));
+    _car_textures[6].from_file(renderer, graphics_path + "cars/ainara.png", car_width);
+    _cars.resize(_nplayers);
+    for (int i = 0; i < _nplayers; ++i) {
+      if (i == 0  && !_cars[i].set_textures(&_car_textures[0],
+                                            Point2d(1165, 501), &_car_textures[1],
+                                            Point2d(182, 494), &_car_textures[2],
+                                            Point2d(9, 469)) )
+        return false;
+      else if (i == 1  && !_cars[i].set_textures(&_car_textures[3],
+                                                 Point2d(1211, 502), &_car_textures[4],
+                                                 Point2d(182, 513), &_car_textures[5],
+                                                 Point2d(7, 484)))
+        return false;
+      // default car
+      else if (i >= 2 && !_cars[i].set_textures(&_car_textures[6],
+                                                Point2d(1165, 501), &_car_textures[1],
+                                                Point2d(182, 494), &_car_textures[2],
+                                                Point2d(9, 469)))
+        return false;
+      _cars[i].set_position(Point2d(200, (i+1) * winh / (_nplayers+1)));
+    }
     // init fishes
     unsigned int nfish_textures = 8;
     _fish_textures.resize(nfish_textures);
@@ -333,11 +404,26 @@ public:
     DEBUG_PRINT("Game::clean()\n");
     SDL_DestroyRenderer( renderer);
     SDL_DestroyWindow( window );
+    //Stop the music
+    if (_music)
+      Mix_FreeMusic( _music );
+    _music = NULL;
+    Mix_FreeChunk_safe(_grab_collectable_sfx);
+    Mix_FreeChunk_safe(_last_lap_fanfare_sfx);
+    Mix_FreeChunk_safe(_pre_start_race_sfx);
+    Mix_FreeChunk_safe(_race_finish_sfx);
+    Mix_FreeChunk_safe(_start_race_sfx);
+    Mix_FreeChunk_safe(_track_intro_sfx);
+    if (_score_font)
+      TTF_CloseFont( _score_font );
+    if (_time_font)
+      TTF_CloseFont( _time_font );
+    _score_font = _time_font = NULL;
     for (unsigned int i = 0; i < gameControllers.size(); ++i)
       SDL_JoystickClose( gameControllers[i] );
-    if (_font)
-      TTF_CloseFont( _font );
-    _font = NULL;
+    //Quit SDL subsystems
+    Mix_Quit();
+    IMG_Quit();
     SDL_Quit();
     return true;
   }
@@ -345,6 +431,68 @@ public:
 
   bool update() {
     DEBUG_PRINT("Game::update()\n");
+    // check game status changes
+    if (_game_status == GAME_STATUS_WAITING) {
+      DEBUG_PRINT("Game status: WAITING->COUNTDOWN()\n");
+      _game_status = GAME_STATUS_COUNTDOWN;
+      _game_timer.reset();
+      _candy.move_far_away();
+      Mix_HaltMusic();
+      // reset ranks and scores
+      for (int i = 0; i < _nplayers; ++i) {
+        _cars[i].rank = -1;
+        _scores[i] = 0;
+        if (!_score_textures[i].loadFromRenderedText(renderer, _score_font, "0", 255, 0, 0))
+          return false;
+      }
+      _time_texture.loadFromRenderedText(renderer, _time_font, "0", 255, 0, 0);
+    }
+    else if (_game_status == GAME_STATUS_COUNTDOWN) {
+      if (_game_timer.getTimeSeconds() >= COUNTDOWN_LENGTH) {
+        DEBUG_PRINT("Game status: COUNTODWNG->RACE()\n");
+        _game_status = GAME_STATUS_RACE;
+        _game_timer.reset();
+        //Play the music
+        Mix_PlayChannel( -1, _start_race_sfx, 0 );
+        Mix_PlayMusic( _music, -1 );
+      }
+    }
+    else if (_game_status == GAME_STATUS_RACE) {
+      if (_game_timer.getTimeSeconds() >= GAME_LENGTH) {
+        DEBUG_PRINT("Game status: RACE->RACE_OVER()\n");
+        _game_status = GAME_STATUS_RACE_OVER;
+        _candy.move_far_away();
+        Mix_HaltMusic();
+        Mix_PlayChannel( -1, _race_finish_sfx, 0 );
+        podium();
+      }
+    }
+    // update all subcomponents
+    for (unsigned int i = 0; i < _nplayers; ++i)
+      _cars[i].update(_winw, _winh, &_bubble_man);
+    for (unsigned int i = 0; i < _fishes.size(); ++i)
+      _fishes[i].update(_winw, _winh);
+    if (_game_status ==  GAME_STATUS_RACE && !_candy.update(_winw, _winh, _cars))
+      return false;
+    _bubble_man.update(_winw, _winh);
+    // check candy touched by car
+    if (_game_status == GAME_STATUS_RACE) {
+      for (unsigned int i = 0; i < _nplayers; ++i) {
+        if (!_cars[i].collides_with(_candy, 80))
+          continue;
+        DEBUG_PRINT("Car %i got a candy at time %g!\n", i, _candy.get_life_timer());
+        Mix_PlayChannel( -1, _grab_collectable_sfx, 0 );
+        ++_scores[i];
+        std::ostringstream score;
+        score << _scores[i];
+        if (!_score_textures[i].loadFromRenderedText(renderer, _score_font, score.str(), 255, 0, 0))
+          return false;
+        if (!_candy.respawn(_winw, _winh, _cars))
+          return false;
+      }
+    }
+
+    // update with events
     SDL_Event event;
     while ( SDL_PollEvent( &event ) ) {
       if ( event.type == SDL_QUIT )
@@ -353,6 +501,8 @@ public:
         SDL_Keycode key = event.key.keysym.sym;
         if (key == SDLK_q)
           return false;
+        else if (key == SDLK_r)
+          _game_status = GAME_STATUS_WAITING;
         else if (key == SDLK_UP)
           _cars.front().advance(10);
         else if (key == SDLK_DOWN)
@@ -364,7 +514,7 @@ public:
       } // end SDL_KEYDOWN
       else if( event.type == SDL_JOYAXISMOTION ) {
         //Motion on controller 0
-        if( event.jaxis.which <= _cars.size() ) {
+        if( event.jaxis.which <= _nplayers ) {
           Car* car = &(_cars[event.jaxis.which]);
 #if 1 // control car accelerations
           Point2d accel = car->get_accel();
@@ -382,25 +532,7 @@ public:
         }
       } // end SDL_JOYAXISMOTION
     } // end while ( SDL_PollEvent( &event ) )
-    // update all subcomponents
-    for (unsigned int i = 0; i < _cars.size(); ++i)
-      _cars[i].update(_winw, _winh, &_bubble_man);
-    for (unsigned int i = 0; i < _fishes.size(); ++i)
-      _fishes[i].update(_winw, _winh);
-    bool ok = _candy.update(_winw, _winh, _cars);
-    _bubble_man.update(_winw, _winh);
-    // check candy touched by car
-    for (unsigned int i = 0; i < _cars.size(); ++i) {
-      if (_cars[i].collides_with(_candy, 80)) {
-        printf("Collision car %i %g!\n", i, _candy.get_life_timer());
-        ++_scores[i];
-        std::ostringstream score;
-        score << _scores[i];
-        _score_textures[i].loadFromRenderedText(renderer, _font, score.str(), 255, 0, 0);
-        _candy.respawn(_winw, _winh, _cars);
-      }
-    }
-    return ok;
+    return true;
   }
 
   //////////////////////////////////////////////////////////////////////////////
@@ -409,15 +541,45 @@ public:
     SDL_RenderClear( renderer );
     DEBUG_PRINT("Game::render()\n");
     bool ok = _candy.render(renderer);
-    for (unsigned int i = 0; i < _cars.size(); ++i)
+    for (unsigned int i = 0; i < _nplayers; ++i) {
       ok  = ok && _cars[i].render(renderer);
+      // rander rank cup if needed
+      int rank = _cars[i].rank;
+      if (rank < 0 || rank >= 3)
+        continue;
+      Point2d pos = _cars[i].get_position() + Point2d(0, -_cars[i].get_entity_radius());
+      _cup_textures[rank].render_center(renderer, pos);
+    }
     for (unsigned int i = 0; i < _fishes.size(); ++i)
       ok  = ok && _fishes[i].render(renderer);
     ok  = ok && _bubble_man.render(renderer);
-    for (unsigned int i = 0; i < _score_textures.size(); ++i) {
-      ok = ok && _car_textures[3*i].render_center(renderer, Point2d(100 + 200 * i, 30), .5);
-      ok = ok && _score_textures[i].render_center(renderer, Point2d(170 + 200 * i, 30));
+    // render scores
+    for (unsigned int i = 0; i < _nplayers; ++i) {
+      int cell = _winw / (_nplayers+1), x = cell * (i+1);
+      ok = ok && _cars[i].get_texture()->render_center(renderer, Point2d(x, 30), .5);
+      ok = ok && _score_textures[i].render_center(renderer, Point2d(x + 70, 30));
+      int rank = _cars[i].rank; // render rank cup if needed
+      if (rank >= 0 && rank < 3)
+        ok = ok && _cup_textures[rank].render_center(renderer, Point2d(x - 60, 30), .5);
     }
+    // render time
+    // refresh time if needed
+    if (_game_status == GAME_STATUS_COUNTDOWN) {
+      int time = COUNTDOWN_LENGTH + 1 -_game_timer.getTimeSeconds();
+      if (time <= 3 && time != _last_renderer_time)
+        Mix_PlayChannel( -1, _pre_start_race_sfx, 0 );
+      ok = ok && render_time(time, 255, 0, 0)
+           && _time_texture.render_center(renderer, Point2d(50, 50),1);
+    } // end if GAME_STATUS_COUNTDOWN
+    else if (_game_status == GAME_STATUS_RACE) {
+      int time = GAME_LENGTH + 1 - _game_timer.getTimeSeconds();
+      if (time == 9 && _last_renderer_time == 10) // 10 last seconds sfx
+        Mix_PlayChannel( -1, _last_lap_fanfare_sfx, 0 ); // last seconds
+      else if (time <= 5 && time != _last_renderer_time)
+        Mix_PlayChannel( -1, _pre_start_race_sfx, 0 );
+      ok = ok && render_time(time, 255, 255, 255)
+           && _time_texture.render_center(renderer, Point2d(50, 50),1);
+    } // end if GAME_STATUS_RACE
     DEBUG_PRINT("render finished()\n");
     SDL_RenderPresent( renderer);
     return ok;
@@ -427,22 +589,60 @@ public:
   //////////////////////////////////////////////////////////////////////////////
 
 protected:
+  void podium() { // set ranks for each player
+    // https://stackoverflow.com/questions/9025084/sorting-a-vector-in-descending-order
+    std::vector<int> scores_sorted = _scores;
+    std::sort(scores_sorted.begin(), scores_sorted.end(), std::greater<int>());
+    for (int rank = 2; rank >= 0; --rank) {
+      for (int i = 0; i < _nplayers; ++i) {
+        if (_scores[i] == scores_sorted[rank])
+          _cars[i].rank = rank;
+      }
+    }
+  } // end podium()
+
+  //! \return true if render OK or already done
+  bool render_time(const int time, int r, int g, int b) {
+    if (_last_renderer_time == time)
+      return true;
+    std::ostringstream time_str; time_str << time;
+    _last_renderer_time = time;
+    return _time_texture.loadFromRenderedText(renderer, _time_font, time_str.str(),
+                                              r, g, b);
+  }
+
   SDL_Window* window;
   SDL_Renderer* renderer;
+  int _winw, _winh, _nplayers;
+  Timer _game_timer;
+  GameStatus _game_status;
+  // joystick stuff
   std::vector<SDL_Joystick*> gameControllers;
-  TTF_Font *_font;
-  int _winw, _winh;
-  Candy _candy;
-  std::vector<Car> _cars;
-  std::vector<Fish> _fishes;
-  BubbleManager _bubble_man;
-  std::vector<int> _scores;
-  // my textures
-  Texture _bubble_tex;
+  // score stuff
+  TTF_Font *_score_font;
   std::vector<Texture> _score_textures;
+  std::vector<int> _scores;
+  // time display stuff
+  TTF_Font *_time_font;
+  int _last_renderer_time;
+  Texture _time_texture;
+  // music stuff
+  Mix_Music *_music;
+  Mix_Chunk* _grab_collectable_sfx, *_last_lap_fanfare_sfx, *_pre_start_race_sfx,
+  *_race_finish_sfx, *_start_race_sfx, *_track_intro_sfx;
+  // candy stuff
+  Candy _candy;
   std::vector<Texture> _candy_textures;
+  // cars stuff
+  std::vector<Car> _cars;
   std::vector<Texture> _car_textures;
+  std::vector<Texture> _cup_textures;
+  // fish stuff
+  std::vector<Fish> _fishes;
   std::vector<Texture> _fish_textures;
+  // bublle stuff
+  BubbleManager _bubble_man;
+  Texture _bubble_tex;
 }; // end Game
 
 ////////////////////////////////////////////////////////////////////////////////
