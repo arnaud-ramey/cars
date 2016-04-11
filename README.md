@@ -16,14 +16,37 @@ It will display the help of the program.
 Credits
 =======
 
-Images
-------
-
-  - `models/bubble.png`:
-    [openclipart.org](https://openclipart.org/detail/195743/bubble)
-
 Fonts
 ----
 
-  - `fonts/bubble.png`:
-    [myfontfree.com](http://www.myfontfree.com/lcd2-myfontfreecom55f70418.htm)
+  - `fonts/DejaVuSans-Bold.ttf`:
+    included in Ubuntu.
+
+  - `fonts/LCD2U___.TTF`:    [myfontfree.com](http://www.myfontfree.com/lcd2-myfontfreecom55f70418.htm)
+
+Graphics
+--------
+
+  - `graphics/candy/*, graphics/cars/*, graphics/fish/*`:
+    homemade
+
+  - `graphics/bubble.png`:
+    [openclipart.org](https://openclipart.org/detail/195743/bubble)
+
+  - `graphics/cup_*.png`:
+    [supertuxkart.sourceforge.net](http://supertuxkart.sourceforge.net/)
+
+Music
+-----
+
+  - `music/cocoa_river.ogg`:
+    [supertuxkart.sourceforge.net](http://supertuxkart.sourceforge.net/)
+
+  - `music/unai_arnaud.flac`:
+    homemade
+
+Sounds
+------
+
+  - `sounds/*`:
+    [supertuxkart.sourceforge.net](http://supertuxkart.sourceforge.net/)
