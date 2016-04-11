@@ -28,6 +28,7 @@ ________________________________________________________________________________
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL2_gfxPrimitives.h>
+#include <SDL2/SDL_ttf.h>
 #include "timer.h"
 #include <sstream>
 #include <vector>
@@ -388,7 +389,31 @@ public:
     _width = _sdlsurface->w;
     _height = _sdlsurface->h;
     return true;
-  }// end load()
+  }// end from_file()
+
+  //////////////////////////////////////////////////////////////////////////////
+
+  bool loadFromRenderedText(SDL_Renderer* renderer,
+                            std::string textureText, SDL_Color textColor ) {
+    //Get rid of preexisting texture
+    free();
+    //Render text surface
+    _sdlsurface = TTF_RenderText_Solid( gFont, textureText.c_str(), textColor );
+    if( _sdlsurface == NULL ) {
+      printf( "Unable to render text surface! SDL_ttf Error: %s\n", TTF_GetError() );
+      return false;
+    }
+    //Create texture from surface pixels
+    _sdltex = SDL_CreateTextureFromSurface( renderer, _sdlsurface );
+    if( _sdltex == NULL ) {
+      printf( "Unable to create texture from rendered text! SDL Error: %s\n", SDL_GetError() );
+      return false;
+    }
+    //Get image dimensions
+    _width = _sdlsurface->w;
+    _height = _sdlsurface->h;
+    return true;
+  }
 
   //////////////////////////////////////////////////////////////////////////////
 

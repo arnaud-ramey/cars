@@ -215,7 +215,7 @@ public:
     }
     // create window
     SDL_Rect windowRect = { 10, 10, _winw, _winh};
-    window = SDL_CreateWindow( "Server", windowRect.x, windowRect.y, _winw, _winh, 0 );
+    window = SDL_CreateWindow( "cars", windowRect.x, windowRect.y, _winw, _winh, 0 );
     if ( window == NULL ) {
       std::cout << "Failed to create window : " << SDL_GetError();
       return false;
@@ -242,6 +242,12 @@ public:
 
     std::string base_path = SDL_GetBasePath(), model_path = base_path + "../models/";
     DEBUG_PRINT("base_path:'%s'\n", base_path.c_str());
+    //Open the font
+    gFont = TTF_OpenFont( "16_true_type_fonts/lazy.ttf", 28 );
+    if( gFont == NULL ) {
+      printf( "Failed to load lazy font! SDL_ttf Error: %s\n", TTF_GetError() );
+      success = false;
+    }
     // init bubble manager
     _bubble_tex.from_file(renderer, model_path + "bubble.png", 50);
     _bubble_man.set_texture(&_bubble_tex);
@@ -391,6 +397,7 @@ protected:
   SDL_Window* window;
   SDL_Renderer* renderer;
   std::vector<SDL_Joystick*> gameControllers;
+  TTF_Font *gFont;
   int _winw, _winh;
   Candy _candy;
   std::vector<Car> _cars;

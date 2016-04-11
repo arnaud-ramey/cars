@@ -10,7 +10,7 @@ find_package(SDL2 REQUIRED)
 include_directories(${SDL2_INCLUDE_DIR})
 FIND_PACKAGE(OpenCV REQUIRED )
 
-# sudo apt-get install libsdl2-image-dev libsdl2-gfx-dev
+# sudo apt-get install libsdl2-image-dev libsdl2-gfx-dev libsdl2-ttf-dev
 ADD_EXECUTABLE(cars cars.cpp timer.h sdl_utils.h)
-TARGET_LINK_LIBRARIES(cars ${OpenCV_LIBS} ${SDL2_LIBRARY} SDL2_image SDL2_gfx)
+TARGET_LINK_LIBRARIES(cars ${OpenCV_LIBS} ${SDL2_LIBRARY} SDL2_image SDL2_gfx SDL2_ttf)
 
