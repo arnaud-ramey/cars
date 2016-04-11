@@ -21,3 +21,9 @@ Images
 
   - `models/bubble.png`:
     [openclipart.org](https://openclipart.org/detail/195743/bubble)
+
+Fonts
+----
+
+  - `fonts/bubble.png`:
+    [myfontfree.com](http://www.myfontfree.com/lcd2-myfontfreecom55f70418.htm)

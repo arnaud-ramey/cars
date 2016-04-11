@@ -394,11 +394,20 @@ public:
   //////////////////////////////////////////////////////////////////////////////
 
   bool loadFromRenderedText(SDL_Renderer* renderer,
-                            std::string textureText, SDL_Color textColor ) {
+                            TTF_Font *font,
+                            std::string textureText,
+                            int r, int g, int b, int a = 255,
+                            int bgr = 0, int bgg = 0, int bgb = 0, int bga = 0) {
     //Get rid of preexisting texture
     free();
     //Render text surface
-    _sdlsurface = TTF_RenderText_Solid( gFont, textureText.c_str(), textColor );
+    SDL_Color fg = {r, g, b, a};
+    if (bga <= 0)
+      _sdlsurface = TTF_RenderText_Solid( font, textureText.c_str(), fg );
+    else {
+      SDL_Color bg = {bgr, bgg, bgb, bga};
+      _sdlsurface = TTF_RenderText_Shaded( font, textureText.c_str(), fg, bg );
+    }
     if( _sdlsurface == NULL ) {
       printf( "Unable to render text surface! SDL_ttf Error: %s\n", TTF_GetError() );
       return false;

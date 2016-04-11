@@ -34,6 +34,7 @@ public:
   //////////////////////////////////////////////////////////////////////////////
 
   void update(int winw, int winh) {
+    //double speedx = cos(3*get_life_timer()); set_angspeed(speedx);
     if (!is_visible(winw, winh))
       move_random_border(winw, winh);
     Entity::update_pos_speed();
@@ -61,7 +62,7 @@ public:
   void update(int winw, int winh) {
     for (unsigned int i = 0; i < _bubbles.size(); ++i) {
       Entity* b = &(_bubbles[i]);
-      double speedx = 100*sin(3*b->get_life_timer()+b->get_width());
+      double speedx = 100*cos(3*b->get_life_timer()+b->get_width());
       b->set_speed( Point2d( speedx, b->get_speed().y));// make bubble oscillate
       b->update_pos_speed();
       if (!b->is_visible(winw, winh)) {
@@ -166,7 +167,7 @@ public:
     return true;
   }
 
-  bool respawn(int winw, int winh){
+  bool respawn(int winw, int winh, std::vector<Car> & cars){
     if (_candy_textures.empty()) {
       printf("Cannot respawn candy without texture!\n");
       return false;
@@ -175,15 +176,23 @@ public:
     _tex_idx = rand() % _candy_textures.size();
     set_texture(_candy_textures[_tex_idx]);
     Point2d old_pos = get_position();
-    while ((get_position() - old_pos).norm() < winw / 3)
+    for (int tryidx = 0; tryidx < 100; ++tryidx) {
       set_position(Point2d(.1 * winw + rand() % (int) (.8 * winw),
                            .1 * winh + rand() % (int) (.8 * winh)));
+      if ((get_position() - old_pos).norm() < winw / 3)
+        continue;
+      for (int i = 0; i < cars.size(); ++i) {
+        if ((get_position() - cars[i].get_position()).norm() < winw / 3)
+          continue;
+      }
+      break;
+    } // end tryidx
     return true;
   }
 
-  bool update(int winw, int winh) {
+  bool update(int winw, int winh, std::vector<Car> & cars) {
     if (get_position().x <= 0)
-      return respawn(winw, winh);
+      return respawn(winw, winh, cars);
     return true;
   } // end update()
 
@@ -199,6 +208,7 @@ class Game {
 public:
   bool init(unsigned int winw, unsigned int winh) {
     unsigned int nfishes = 15;
+    unsigned int nplayers = 2;
     _winw = winw;
     _winh  = winh; // pixels
 
@@ -212,6 +222,12 @@ public:
     int imgFlags = IMG_INIT_PNG;
     if( !( IMG_Init( imgFlags ) & imgFlags ) ) {
       printf( "SDL_image could not initialize! SDL_image Error: %s\n", IMG_GetError() );
+      return false;
+    }
+    //Initialize SDL_ttf
+    if( TTF_Init() == -1 ) {
+      printf( "SDL_ttf could not initialize! SDL_ttf Error: %s\n", TTF_GetError() );
+      return false;
     }
     // create window
     SDL_Rect windowRect = { 10, 10, _winw, _winh};
@@ -240,24 +256,30 @@ public:
         DEBUG_PRINT( "Joystick %i connected\n", i);
     }
 
-    std::string base_path = SDL_GetBasePath(), model_path = base_path + "../models/";
+    std::string base_path = SDL_GetBasePath(),
+        data_path = base_path + "../data/",
+        graphics_path = data_path + "graphics/";
     DEBUG_PRINT("base_path:'%s'\n", base_path.c_str());
     //Open the font
-    gFont = TTF_OpenFont( "16_true_type_fonts/lazy.ttf", 28 );
-    if( gFont == NULL ) {
-      printf( "Failed to load lazy font! SDL_ttf Error: %s\n", TTF_GetError() );
-      success = false;
+    _font = TTF_OpenFont( (data_path + "fonts/LCD2U___.TTF").c_str(), 40 );
+    if( _font == NULL ) {
+      printf( "Failed to load font! SDL_ttf Error: %s\n", TTF_GetError() );
+      return false;
     }
+    _score_textures.resize(nplayers);
+    _scores.resize(nplayers);
+    for (int i = 0; i < nplayers; ++i)
+      _score_textures[i].loadFromRenderedText(renderer, _font, "0", 255, 0, 0);
     // init bubble manager
-    _bubble_tex.from_file(renderer, model_path + "bubble.png", 50);
+    _bubble_tex.from_file(renderer, graphics_path + "bubble.png", 50);
     _bubble_man.set_texture(&_bubble_tex);
     for (unsigned int i = 0; i < 10; ++i)
       _bubble_man.create_bubble(Point2d(rand()% _winw, rand() % _winh), .5);
     // init candy
     _candy_textures.resize(3);
-    _candy_textures[0].from_file(renderer, model_path + "fish/chuche1.png", 100);
-    _candy_textures[1].from_file(renderer, model_path + "fish/chuche2.png", 50);
-    _candy_textures[2].from_file(renderer, model_path + "fish/huevo.png", 80);
+    _candy_textures[0].from_file(renderer, graphics_path + "candy/chuche1.png", 100);
+    _candy_textures[1].from_file(renderer, graphics_path + "candy/chuche2.png", 50);
+    _candy_textures[2].from_file(renderer, graphics_path + "candy/huevo.png", 80);
     std::vector<Texture*> candy_texture_ptrs;
     for (int i = 0; i < _candy_textures.size(); ++i)
       candy_texture_ptrs.push_back(&_candy_textures[i]);
@@ -265,17 +287,17 @@ public:
     // init cars
     unsigned int car_width = 200; // px
     _car_textures.resize(6);
-    _car_textures[0].from_file(renderer, model_path + "arnaud.png", car_width);
-    _car_textures[1].from_file(renderer, model_path + "arnaud_front_wheel.png",
+    _car_textures[0].from_file(renderer, graphics_path + "cars/arnaud.png", car_width);
+    _car_textures[1].from_file(renderer, graphics_path + "cars/arnaud_front_wheel.png",
                                -1, -1, _car_textures[0].get_resize_scale());
-    _car_textures[2].from_file(renderer, model_path + "arnaud_back_wheel.png",
+    _car_textures[2].from_file(renderer, graphics_path + "cars/arnaud_back_wheel.png",
                                -1, -1, _car_textures[0].get_resize_scale());
-    _car_textures[3].from_file(renderer, model_path + "unai.png", car_width);
-    _car_textures[4].from_file(renderer, model_path + "unai_front_wheel.png",
+    _car_textures[3].from_file(renderer, graphics_path + "cars/unai.png", car_width);
+    _car_textures[4].from_file(renderer, graphics_path + "cars/unai_front_wheel.png",
                                -1, -1, _car_textures[3].get_resize_scale());
-    _car_textures[5].from_file(renderer, model_path + "unai_back_wheel.png",
+    _car_textures[5].from_file(renderer, graphics_path + "cars/unai_back_wheel.png",
                                -1, -1, _car_textures[3].get_resize_scale());
-    _cars.resize(2);
+    _cars.resize(nplayers);
     if (!_cars[0].set_textures(&_car_textures[0],
                                Point2d(1165, 501), &_car_textures[1],
                                Point2d(182, 494), &_car_textures[2],
@@ -293,7 +315,7 @@ public:
     int fish_size = 100; // px
     for (unsigned int i = 0; i < nfish_textures; ++i) {
       std::ostringstream filename;
-      filename << model_path + "fish/pez"<< i+1 << ".png";
+      filename << graphics_path + "fish/pez"<< i+1 << ".png";
       _fish_textures[i].from_file(renderer, filename.str(), fish_size);
     }
     _fishes.resize(nfishes);
@@ -313,6 +335,9 @@ public:
     SDL_DestroyWindow( window );
     for (unsigned int i = 0; i < gameControllers.size(); ++i)
       SDL_JoystickClose( gameControllers[i] );
+    if (_font)
+      TTF_CloseFont( _font );
+    _font = NULL;
     SDL_Quit();
     return true;
   }
@@ -362,13 +387,17 @@ public:
       _cars[i].update(_winw, _winh, &_bubble_man);
     for (unsigned int i = 0; i < _fishes.size(); ++i)
       _fishes[i].update(_winw, _winh);
-    bool ok = _candy.update(_winw, _winh);
+    bool ok = _candy.update(_winw, _winh, _cars);
     _bubble_man.update(_winw, _winh);
     // check candy touched by car
     for (unsigned int i = 0; i < _cars.size(); ++i) {
       if (_cars[i].collides_with(_candy, 80)) {
         printf("Collision car %i %g!\n", i, _candy.get_life_timer());
-        _candy.respawn(_winw, _winh);
+        ++_scores[i];
+        std::ostringstream score;
+        score << _scores[i];
+        _score_textures[i].loadFromRenderedText(renderer, _font, score.str(), 255, 0, 0);
+        _candy.respawn(_winw, _winh, _cars);
       }
     }
     return ok;
@@ -385,6 +414,10 @@ public:
     for (unsigned int i = 0; i < _fishes.size(); ++i)
       ok  = ok && _fishes[i].render(renderer);
     ok  = ok && _bubble_man.render(renderer);
+    for (unsigned int i = 0; i < _score_textures.size(); ++i) {
+      ok = ok && _car_textures[3*i].render_center(renderer, Point2d(100 + 200 * i, 30), .5);
+      ok = ok && _score_textures[i].render_center(renderer, Point2d(170 + 200 * i, 30));
+    }
     DEBUG_PRINT("render finished()\n");
     SDL_RenderPresent( renderer);
     return ok;
@@ -397,14 +430,16 @@ protected:
   SDL_Window* window;
   SDL_Renderer* renderer;
   std::vector<SDL_Joystick*> gameControllers;
-  TTF_Font *gFont;
+  TTF_Font *_font;
   int _winw, _winh;
   Candy _candy;
   std::vector<Car> _cars;
   std::vector<Fish> _fishes;
   BubbleManager _bubble_man;
+  std::vector<int> _scores;
   // my textures
   Texture _bubble_tex;
+  std::vector<Texture> _score_textures;
   std::vector<Texture> _candy_textures;
   std::vector<Texture> _car_textures;
   std::vector<Texture> _fish_textures;
