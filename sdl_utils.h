@@ -32,8 +32,14 @@ ________________________________________________________________________________
 #include <sstream>
 #include <vector>
 
+#define DEBUG               0
+
 #define DEBUG_PRINT(...)   {}
-//#define DEBUG_PRINT(...)   printf(__VA_ARGS__)
+#if DEBUG
+#undef  DEBUG_PRINT
+#define DEBUG_PRINT(...)   printf(__VA_ARGS__)
+#endif
+
 #define RAD2DEG     57.2957795130823208768  //!< to convert radians to degrees
 #define DEG2RAD     0.01745329251994329577  //!< to convert degrees to radians
 
@@ -123,13 +129,6 @@ public:
   }
   //implicit conversion
   operator SDL_Point() const { return to_sdl(); }
-
-  //  //! return a string representation of the point
-  //  inline std::string to_string() const {
-  //    std::ostringstream ans;
-  //    ans << *this;
-  //    return ans.str();
-  //  }
 
   _Type x; //!< the first data field
   _Type y; //!< the second data field
@@ -539,14 +538,23 @@ public:
   Entity() {
     _tex_ptr = NULL;
     _bbox_offset.resize(4);
-    _tex_radius = _angle = 0;
+    _tex_radius = _angle = _angspeed = 0;
     _rendering_scale  = 1;
     _compute_tight_bbox_needed = true;
+    _collision_pt = Point2d(-1, -1);
     set_position(Point2d(0, 0));
   }
 
   double get_update_timer() const               { return  _update_timer.getTimeSeconds(); }
   double get_life_timer()   const               { return  _life_timer.getTimeSeconds(); }
+  void set_angle(const double & angle)          { _angle = angle; }
+  double get_angle() const                      { return  _angle; }
+  void set_angspeed(const double & angspeed)    { _angspeed = angspeed; }
+  double get_angspeed() const                   { return  _angspeed; }
+  void increase_angle(const double & dangle)    {
+    _compute_tight_bbox_needed = true;
+    _angle += dangle;
+  }
   void set_accel(const Point2d & accel)         { _accel = accel; }
   void renorm_accel(const double & newnorm)     { _accel.renorm(newnorm); }
   Point2d get_accel() const                     { return  _accel; }
@@ -559,18 +567,21 @@ public:
     _position = position;
   }
   Point2d get_position() const                  { return  _position; }
-  void increase_angle(const double & dangle)    {
-    _compute_tight_bbox_needed = true;
-    _angle += dangle;
-  }
   void advance(const double & dist) {
     set_position(_position + rotate(Point2d(dist, 0), _angle));
   }
   void update_pos_speed() {
     Timer::Time time = _update_timer.getTimeSeconds();
+    _compute_tight_bbox_needed = true;
+    _angle += time * _angspeed;
     _speed += time * _accel;
     _position += time * _speed;
-    _compute_tight_bbox_needed = true;
+    // update children
+    for (int i = 0; i < _children.size(); ++i) {
+      _children[i].second.update_pos_speed();
+      // restore joint position
+      _children[i].second.set_position( offset2world_pos( _children[i].first ) );
+    }
     _update_timer.reset();
   }
 
@@ -588,6 +599,7 @@ public:
 
   void set_rendering_scale(const double & rendering_scale) {
     _rendering_scale = rendering_scale;
+    _entity_radius = _tex_radius * _rendering_scale;
   }
   double get_rendering_scale() const                     { return  _rendering_scale; }
   inline int get_width() const {
@@ -602,6 +614,9 @@ public:
             && _position.y >= -_entity_radius
             && _position.y <= winh+_entity_radius);
   }
+  void add_child(const Point2d & offset, const Entity & child) {
+    _children.push_back(std::make_pair(offset, child));
+  }
 
   bool render(SDL_Renderer* renderer) {
     if (!_tex_ptr) {
@@ -612,6 +627,10 @@ public:
       printf("Entity::render() failed : tex_ptr->render_center() failed.\n");
       return false;
     }
+    bool ok = true;
+    for (int i = 0; i < _children.size(); ++i)
+      ok = ok && _children[i].second.render(renderer);
+#if DEBUG
     //render_point(renderer, _position, 3, 255, 0, 0, 255);
     render_arrow(renderer, _position, _position + _speed, 255, 0, 0, 255);
     render_arrow(renderer, _position, _position + _accel, 0, 255, 0, 255);
@@ -619,8 +638,10 @@ public:
     rough_bbox(rb);
     render_rect(renderer, rb, 200, 0, 0, 255);
     render_polygon(renderer, get_tight_bbox(), 0, 255, 0, 255);
-    //render_point(renderer, _collision_pt, 5, 255, 255, 0);
-    return true;
+    if (_collision_pt.x > 0)
+      render_point(renderer, _collision_pt, 5, 255, 255, 0);
+#endif
+    return ok;
   }
 
   inline Point2d offset2world_pos(const Point2d & p) const {
@@ -688,7 +709,8 @@ public:
 protected:
   Timer _life_timer, _update_timer;
   Point2d _position, _accel, _speed;
-  double _angle, _tex_radius, _entity_radius, _rendering_scale;
+  double _angle, _angspeed;
+  double _tex_radius, _entity_radius, _rendering_scale;
   bool _compute_tight_bbox_needed;
   inline std::vector<Point2d> & get_tight_bbox() {
     compute_tight_bbox_if_needed();
@@ -697,6 +719,7 @@ protected:
   Texture* _tex_ptr;
   Point2d _collision_pt;
   std::vector<Point2d> _bbox_offset, _tight_bbox;
+  std::vector< std::pair<Point2d, Entity> > _children;
 }; // end class Entity
 
 #endif // SDL_UTILS_H
