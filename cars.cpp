@@ -650,7 +650,7 @@ protected:
 ////////////////////////////////////////////////////////////////////////////////
 
 int main(int argc, char** argv) {
-  if (argc <= 1 || argc >= 3) {
+  if (argc <= 1 || argc >= 5) {
     printf("Synposis: %s nplayers [winw] [winh]\n", argv[0]);
     printf("  nplayers: number of players, between 1 and 10\n");
     printf("  winw:     window width  in pixels [default: 800]\n");
