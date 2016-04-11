@@ -335,13 +335,13 @@ public:
   void free() {
     if(!_width)
       return;
-    printf("Texture::free(%ix%i)\n", _width, _height);
+    DEBUG_PRINT("Texture::free(%ix%i)\n", _width, _height);
     _width =  _height = 0;
     _resize_scale = 1;
     //Free texture if it exists
-    if (_sdltex)
+    if (_sdltex != NULL)
       SDL_DestroyTexture( _sdltex );
-    if (_sdlsurface)
+    if (_sdlsurface != NULL)
       SDL_FreeSurface( _sdlsurface );
     _sdltex = NULL;
   } // end free()
@@ -357,7 +357,7 @@ public:
 
   bool from_file(SDL_Renderer* renderer, const std::string &str,
                  int goalwidth = -1, int goalheight = -1, double goalscale = -1) {
-    printf("Texture::from_file('%s'), goal:(%i, %i, %g)\n", str.c_str(), goalwidth, goalheight, goalscale);
+    DEBUG_PRINT("Texture::from_file('%s'), goal:(%i, %i, %g)\n", str.c_str(), goalwidth, goalheight, goalscale);
     free();
     // Load image as SDL_Surface
     _sdlsurface = IMG_Load( str.c_str() );
@@ -395,7 +395,7 @@ public:
 
   bool render( SDL_Renderer* renderer, Point2d p, double scale = 1, SDL_Rect* clip = NULL,
                double angle_rad = 0, Point2d center = Point2d(-1, -1),
-               SDL_RendererFlip flip = SDL_FLIP_NONE) {
+               SDL_RendererFlip flip = SDL_FLIP_NONE) const {
     //Set rendering space and render to screen
     SDL_Rect renderQuad = { p.x, p.y, scale * _width, scale * _height };
 
@@ -422,7 +422,7 @@ public:
 
   inline bool render_center( SDL_Renderer* renderer, Point2d p, double scale = 1, SDL_Rect* clip = NULL,
                              double angle_rad = 0, Point2d center = Point2d(-1, -1),
-                             SDL_RendererFlip flip = SDL_FLIP_NONE) {
+                             SDL_RendererFlip flip = SDL_FLIP_NONE) const {
     return render( renderer, p - scale*this->center(), scale, clip, angle_rad, center, flip);
   } // end render_center()
 
@@ -430,7 +430,7 @@ public:
 
   // http://www.sdltutorials.com/sdl-per-pixel-collision
   //! \return alpha in [0, 255], or < 0 if out of bounds
-  inline int get_alpha(const Point2d & p) {
+  inline int get_alpha(const Point2d & p) const {
     if (p.x < 0 || p.x >= get_width()
         || p.y < 0 || p.y >= get_height())
       return -1;
@@ -534,10 +534,13 @@ inline bool render_arrow
 
 ////////////////////////////////////////////////////////////////////////////////
 
-class OrientedObject {
+class Entity {
 public:
-  OrientedObject() {
-    _radius =  _angle = 0;
+  Entity() {
+    _tex_ptr = NULL;
+    _bbox_offset.resize(4);
+    _tex_radius = _angle = 0;
+    _rendering_scale  = 1;
     _compute_tight_bbox_needed = true;
     set_position(Point2d(0, 0));
   }
@@ -570,45 +573,45 @@ public:
     _compute_tight_bbox_needed = true;
     _update_timer.reset();
   }
-  void set_radius(const double & radius)         { _radius = radius; }
-  double get_radius() const                      { return  _radius; }
 
-  bool is_visible(int winw, int winh) {
-    return (_position.x >= -_radius
-            && _position.x <= winw+_radius
-            && _position.y >= -_radius
-            && _position.y <= winh+_radius);
-  }
-
-protected:
-  Timer _life_timer, _update_timer;
-  Point2d _position, _accel, _speed;
-  double _angle, _radius;
-  bool _compute_tight_bbox_needed;
-}; // end class OrientedObject
-
-////////////////////////////////////////////////////////////////////////////////
-
-class OrientedTexture : public OrientedObject {
-public:
-  bool from_file(SDL_Renderer* renderer,
-                 const std::string & filename,
-                 int goalwidth = -1, int goalheight = -1, double goalscale = -1) {
-    // load data
-    if (!_tex.from_file(renderer, filename, goalwidth, goalheight, goalscale))
-      return false;
-    _radius = hypot(_tex.get_width(), _tex.get_height()) / 2;
-    _bbox_offset.resize(4);
+  bool set_texture(Texture* texture) {
+    _tex_ptr = texture;
+    _tex_radius = hypot(get_width(), get_height()) / 2;
+    _entity_radius = _tex_radius * _rendering_scale;
     _bbox_offset[0] = Point2d(0, 0);
-    _bbox_offset[1] = Point2d(0, _tex.get_height());
-    _bbox_offset[2] = Point2d(_tex.get_width(), _tex.get_height());
-    _bbox_offset[3] = Point2d(_tex.get_width(), 0);
+    _bbox_offset[1] = Point2d(0, get_height());
+    _bbox_offset[2] = Point2d(get_width(), get_height());
+    _bbox_offset[3] = Point2d(get_width(), 0);
+    _compute_tight_bbox_needed = true;
     return true;
   } // end from_file()
 
+  void set_rendering_scale(const double & rendering_scale) {
+    _rendering_scale = rendering_scale;
+  }
+  double get_rendering_scale() const                     { return  _rendering_scale; }
+  inline int get_width() const {
+    return ( _tex_ptr  ? _tex_ptr->get_width() : -1);
+  }
+  inline int get_height() const {
+    return (_tex_ptr  ? _tex_ptr->get_height() : -1);
+  }
+  bool is_visible(int winw, int winh) {
+    return (_position.x >= -_entity_radius
+            && _position.x <= winw+_entity_radius
+            && _position.y >= -_entity_radius
+            && _position.y <= winh+_entity_radius);
+  }
+
   bool render(SDL_Renderer* renderer) {
-    if (!_tex.render_center(renderer, _position, 1, NULL, _angle))
+    if (!_tex_ptr) {
+      printf("Entity::render() failed : no texture set\n");
       return false;
+    }
+    if (!_tex_ptr->render_center(renderer, _position, _rendering_scale, NULL, _angle)) {
+      printf("Entity::render() failed : tex_ptr->render_center() failed.\n");
+      return false;
+    }
     //render_point(renderer, _position, 3, 255, 0, 0, 255);
     render_arrow(renderer, _position, _position + _speed, 255, 0, 0, 255);
     render_arrow(renderer, _position, _position + _accel, 0, 255, 0, 255);
@@ -621,17 +624,17 @@ public:
   }
 
   inline Point2d offset2world_pos(const Point2d & p) const {
-    return _position + rotate(p - _tex.center(), _angle);
+    return _position + rotate(_rendering_scale * (p - _tex_ptr->center()), _angle);
   }
   inline Point2d world_pos2offset(const Point2d & p) const {
-    return _tex.center() + rotate(p - _position, -_angle);
+    return _tex_ptr->center() + rotate(p - _position, -_angle);
   }
 
   inline void rough_bbox(SDL_Rect & bbox) const {
-    bbox.x = _position.x - _radius;
-    bbox.y = _position.y - _radius;
-    bbox.w = 2 * _radius;
-    bbox.h = 2 * _radius;
+    bbox.x = _position.x - _entity_radius;
+    bbox.y = _position.y - _entity_radius;
+    bbox.w = 2 * _entity_radius;
+    bbox.h = 2 * _entity_radius;
   }
   inline void compute_tight_bbox_if_needed() {
     if (!_compute_tight_bbox_needed)
@@ -642,10 +645,10 @@ public:
       _tight_bbox[i] = offset2world_pos(_bbox_offset[i]);
   }
 
-  inline bool collides_with(OrientedTexture & other,
+  inline bool collides_with(Entity & other,
                             int minalpha = 1) {
     // rough radius check
-    if ((_position-other._position).norm() > _radius + other._radius)
+    if ((_position-other._position).norm() > _entity_radius + other._entity_radius)
       return false;
     // tight bbox check
     if (!IsPolygonsIntersecting(get_tight_bbox(), other.get_tight_bbox()))
@@ -669,10 +672,10 @@ public:
         // transform test point in picture frame
         Point2d PA = world_pos2offset(_collision_pt);
         // check alpha
-        if (_tex.get_alpha(PA) < minalpha)
+        if (_tex_ptr->get_alpha(PA) < minalpha)
           continue;
         Point2d PB = other.world_pos2offset(_collision_pt);
-        if (other._tex.get_alpha(PB) < minalpha)
+        if (other._tex_ptr->get_alpha(PB) < minalpha)
           continue;
         // matching pixel found
         return true;
@@ -683,14 +686,18 @@ public:
   }
 
 protected:
+  Timer _life_timer, _update_timer;
+  Point2d _position, _accel, _speed;
+  double _angle, _tex_radius, _entity_radius, _rendering_scale;
+  bool _compute_tight_bbox_needed;
   inline std::vector<Point2d> & get_tight_bbox() {
     compute_tight_bbox_if_needed();
     return _tight_bbox;
   }
-  Texture _tex;
+  Texture* _tex_ptr;
   Point2d _collision_pt;
   std::vector<Point2d> _bbox_offset, _tight_bbox;
-}; // end class OrientedTexture
+}; // end class Entity
 
 #endif // SDL_UTILS_H
 

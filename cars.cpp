@@ -1,29 +1,29 @@
 #include <iostream>
 #include "sdl_utils.h"
 
-class Fish : public OrientedTexture {
+class Fish : public Entity {
 public:
   void move_random_border(int winw, int winh) {
     double x = 0, y = 0, angle  = 0;
     int border = rand() % 4;
     if (border == 0) { // left
-      x = -_radius+1;
+      x = -_tex_radius+1;
       y = rand() % winh;
       angle = -M_PI_2 + drand48() * M_PI;
     }
     else if (border == 1) { // up
       x = rand() % winw;
-      y = -_radius+1;
+      y = -_tex_radius+1;
       angle = -M_PI + drand48() * M_PI;
     }
     else if (border == 2) { // right
-      x = winw + _radius-1;
+      x = winw + _tex_radius-1;
       y = rand() % winh;
       angle = M_PI_2 + drand48() * M_PI;
     }
     else if (border == 3) { // down
       x = rand() % winw;
-      y = winh + _radius-1;
+      y = winh + _tex_radius-1;
       angle = drand48() * M_PI;
     }
     set_position(Point2d(x, y));
@@ -36,7 +36,7 @@ public:
   void update(int winw, int winh) {
     if (!is_visible(winw, winh))
       move_random_border(winw, winh);
-    OrientedTexture::update_pos_speed();
+    Entity::update_pos_speed();
   }
 
 protected:
@@ -46,20 +46,22 @@ protected:
 
 class BubbleManager {
 public:
-  bool from_file(SDL_Renderer* renderer, const std::string &str) {
-    return _bubble_tex.from_file(renderer, str, 100);
+  void set_texture(Texture* tex) {
+    _tex = tex;
   }
-  void create_bubble(const Point2d & pos, unsigned int radius_px) {
-    _bubbles.push_back(OrientedObject());
-    _bubbles.back().set_position(pos);
-    _bubbles.back().set_radius(radius_px);
-    _bubbles.back().set_speed(Point2d(0, -30 - rand()%100));
+  void create_bubble(const Point2d & pos, const double & rendering_scale) {
+    Entity b;
+    b.set_position(pos);
+    b.set_rendering_scale(rendering_scale);
+    b.set_speed(Point2d(0, -30 - rand()%100));
+    b.set_texture(_tex);
+    _bubbles.push_back(b);
   }
 
   void update(int winw, int winh) {
     for (unsigned int i = 0; i < _bubbles.size(); ++i) {
-      OrientedObject* b = &(_bubbles[i]);
-      double speedx = 100*sin(3*b->get_life_timer()+b->get_radius());
+      Entity* b = &(_bubbles[i]);
+      double speedx = 100*sin(3*b->get_life_timer()+b->get_width());
       b->set_speed( Point2d( speedx, b->get_speed().y));// make bubble oscillate
       b->update_pos_speed();
       if (!b->is_visible(winw, winh)) {
@@ -73,42 +75,37 @@ public:
     DEBUG_PRINT("BubbleManager::render()\n");
     bool ok = true;
     for (unsigned int i = 0; i < _bubbles.size(); ++i) {
-      ok = ok &&
-          _bubble_tex.render_center(renderer,
-                                    _bubbles[i].get_position(),
-                                    1. * _bubbles[i].get_radius() / _bubble_tex.get_width());
+      ok = ok && _bubbles[i].render(renderer);
     }
     return ok;
   }
 
-  Texture _bubble_tex;
-  std::vector<OrientedObject> _bubbles;
+  std::vector<Entity> _bubbles;
+  Texture* _tex;
 }; // end class BubbleManager
 
 ////////////////////////////////////////////////////////////////////////////////
 
-class Car : public OrientedTexture {
+class Car : public Entity {
 public:
-  bool from_file(SDL_Renderer* renderer,
-            const std::string & car_filename,
-            const Point2d & front_wheel_center_offset,
-            const std::string & front_wheel_filename,
-            const Point2d & back_wheel_center_offset,
-            const std::string & back_wheel_filename,
-            const Point2d & exhaust_pipe_offset,
-            int goalwidth = -1, int goalheight = -1, double goalscale = -1) {
+  bool set_textures(Texture* car_texture,
+                   const Point2d & front_wheel_center_offset,
+                   Texture* front_wheel_texture,
+                   const Point2d & back_wheel_center_offset,
+                   Texture* back_wheel_texture,
+                   const Point2d & exhaust_pipe_offset) {
     // load data
-    if (!OrientedTexture::from_file(renderer, car_filename, goalwidth, goalheight, goalscale)
-        || !_front_wheel_img.from_file(renderer, front_wheel_filename, -1, -1, _tex.get_resize_scale())
-        || !_back_wheel_img.from_file(renderer, back_wheel_filename, -1, -1, _tex.get_resize_scale())) {
+    if (!set_texture(car_texture)
+        || !_front_wheel.set_texture(front_wheel_texture)
+        || !_back_wheel.set_texture(back_wheel_texture)) {
       printf("Car::load() failed\n");
       return false;
     }
     // set default values
     _wheelangle = 0;
-    _front_wheel_center_offset = _tex.get_resize_scale() * front_wheel_center_offset;
-    _back_wheel_center_offset  = _tex.get_resize_scale() * back_wheel_center_offset;
-    _exhaust_pipe_offset       = _tex.get_resize_scale() * exhaust_pipe_offset;
+    _front_wheel_center_offset = car_texture->get_resize_scale() * front_wheel_center_offset;
+    _back_wheel_center_offset  = car_texture->get_resize_scale() * back_wheel_center_offset;
+    _exhaust_pipe_offset       = car_texture->get_resize_scale() * exhaust_pipe_offset;
     set_position(Point2d(0, 0));
     return true;
   } // end load()
@@ -122,34 +119,37 @@ public:
   //////////////////////////////////////////////////////////////////////////////
 
   void update(int winw, int winh, BubbleManager* bubble_gen) {
-    // turn wheels faster if car faster
-    _wheel_angspeed = hypot(_speed.y, _speed.x) / 10;
-    _wheelangle += _wheel_angspeed * _update_timer.getTimeSeconds();
     // orientate car in direction of speed
     if (_speed.norm() > 10)
       _angle = atan2(_speed.y, _speed.x);
-    OrientedTexture::update_pos_speed();
+    Entity::update_pos_speed();
     // stop if going out of the screen
-    if (_position.x < _radius) { // left
+    if (_position.x < _tex_radius) { // left
       _accel.x = std::max(_accel.x + 10, 20.);
       if (_speed.norm() > 100) _speed.renorm(100);
     }
-    else if (_position.x > winw - _radius) { // right
+    else if (_position.x > winw - _tex_radius) { // right
       _accel.x = std::min(_accel.x - 10, -20.);
       if (_speed.norm() > 100) _speed.renorm(100);
     }
-    if (_position.y < _radius) { // up
+    if (_position.y < _tex_radius) { // up
       _accel.y = std::max(_accel.y + 10, 20.);
       if (_speed.norm() > 100) _speed.renorm(100);
     }
-    else if (_position.y > winh - _radius) { // down
+    else if (_position.y > winh - _tex_radius) { // down
       _accel.y = std::min(_accel.y - 10, -20.);
       if (_speed.norm() > 100) _speed.renorm(100);
     }
+    // update wheel pos
+    _front_wheel.set_position( offset2world_pos( _front_wheel_center_offset ) );
+    _back_wheel.set_position( offset2world_pos( _back_wheel_center_offset ) );
+    // turn wheels faster if car faster
+    _wheel_angspeed = hypot(_speed.y, _speed.x) / 10;
+    _wheelangle += _wheel_angspeed * _update_timer.getTimeSeconds();
     // create bubbles randomly or if accelerating
     if ((rand() % 2000 + _accel.norm()) > 1950) {
       Point2d ex = offset2world_pos(_exhaust_pipe_offset);
-      bubble_gen->create_bubble(ex, 5 + rand() % 25 + _accel.norm() / 20); // bigger if accelerating
+      bubble_gen->create_bubble(ex, .2 + .5 * drand48() + _accel.norm() / 2000.); // bigger if accelerating
     }
   }
 
@@ -158,28 +158,27 @@ public:
   bool render(SDL_Renderer* renderer) {
     DEBUG_PRINT("Car::render()\n");
     return
-        OrientedTexture::render(renderer)
-        && _front_wheel_img.render_center(renderer, offset2world_pos(_front_wheel_center_offset),  1, NULL, _wheelangle)
-        && _back_wheel_img.render_center(renderer, offset2world_pos(_back_wheel_center_offset), 1, NULL, _wheelangle);
+        Entity::render(renderer)
+        && _front_wheel.render(renderer)
+        && _back_wheel.render(renderer);
   }
 
 protected:
   // wheel stuff
+  Entity _front_wheel, _back_wheel;
   double _wheelangle, _wheel_angspeed;
-  Texture _front_wheel_img, _back_wheel_img;
   Point2d _front_wheel_center_offset, _back_wheel_center_offset, _exhaust_pipe_offset;
 }; // end class Car
 
 
 ////////////////////////////////////////////////////////////////////////////////
 
-class CandyManager {
+class Candy {
 public:
-  bool add_file(SDL_Renderer* renderer, const std::string &str, int goalwidth = -1) {
-    _candy_textures.resize(_candy_textures.size() + 1);
-    _candy_textures.back().from_file(renderer, str, goalwidth);
-    _candy_textures.back().set_position(Point2d(-1, -1));
-    _curr_candy = &(_candy_textures.back());
+  bool add_texture(Texture* tex) {
+    _candy_textures.push_back(tex);
+    _tex_idx = _candy_textures.size() - 1;
+    _candy.set_texture(_candy_textures.back());
     return true;
   }
 
@@ -188,29 +187,31 @@ public:
       printf("Cannot render candy without texture!\n");
       return false;
     }
-    _curr_idx = rand() % _candy_textures.size();
-    _curr_candy = &(_candy_textures[_curr_idx]);
-    _curr_candy->set_position(Point2d(rand()% winw, rand()%winh));
+    _tex_idx = rand() % _candy_textures.size();
+    _candy.set_texture(_candy_textures[_tex_idx]);
+    _candy.set_position(Point2d(rand()% winw, rand()%winh));
     return true;
   }
 
   bool update(int winw, int winh) {
-    if (_curr_candy->get_position().x < 0)
+    if (_candy.get_position().x < 0)
       return respawn(winw, winh);
     return true;
   } // end update()
 
   bool render(SDL_Renderer* renderer) {
-    DEBUG_PRINT("CandyManager::render()\n");
-    if (_curr_idx >= _candy_textures.size())
+    DEBUG_PRINT("Candy::render()\n");
+    if (_tex_idx >= _candy_textures.size()) {
+      printf("Candy::render() failed\n");
       return false;
-    return _curr_candy->render(renderer);
+    }
+    return _candy.render(renderer);
   }
 
-  std::vector<OrientedTexture> _candy_textures;
-  OrientedTexture* _curr_candy;
-  unsigned int _curr_idx;
-}; // end class CandyManager
+  std::vector<Texture*> _candy_textures;
+  Entity _candy;
+  unsigned int _tex_idx;
+}; // end class Candy
 
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
@@ -265,36 +266,51 @@ public:
     std::string base_path = SDL_GetBasePath(), model_path = base_path + "../models/";
     DEBUG_PRINT("base_path:'%s'\n", base_path.c_str());
     // init bubble manager
-    _bubble_man.from_file(renderer, model_path + "bubble.png");
+    _bubble_tex.from_file(renderer, model_path + "bubble.png", 50);
+    _bubble_man.set_texture(&_bubble_tex);
     for (unsigned int i = 0; i < 10; ++i)
-      _bubble_man.create_bubble(Point2d(rand()% _winw, rand() % _winh), 10 + rand()%100);
+      _bubble_man.create_bubble(Point2d(rand()% _winw, rand() % _winh), .5);
     // init candy
-    _candy_man.add_file(renderer, model_path + "fish/chuche1.png", candy_width);
-    //_candy_man.add_file(renderer, model_path + "fish/chuche2.png", candy_width);
-    //_candy_man.add_file(renderer, model_path + "fish/huevo.png", candy_width);
+    _candy_tex.resize(1);
+    _candy_tex[0].from_file(renderer, model_path + "fish/chuche1.png", candy_width);
+    _candy.add_texture(&(_candy_tex[0]));
     // init cars
+    _car_textures.resize(6);
+    _car_textures[0].from_file(renderer, model_path + "arnaud.png", car_width);
+    _car_textures[1].from_file(renderer, model_path + "arnaud_front_wheel.png",
+                               -1, -1, _car_textures[0].get_resize_scale());
+    _car_textures[2].from_file(renderer, model_path + "arnaud_back_wheel.png",
+                               -1, -1, _car_textures[0].get_resize_scale());
+    _car_textures[3].from_file(renderer, model_path + "unai.png", car_width);
+    _car_textures[4].from_file(renderer, model_path + "unai_front_wheel.png",
+                               -1, -1, _car_textures[3].get_resize_scale());
+    _car_textures[5].from_file(renderer, model_path + "unai_back_wheel.png",
+                               -1, -1, _car_textures[3].get_resize_scale());
     _cars.resize(2);
-    if (!_cars[0].from_file(renderer, model_path + "arnaud.png",
-                            Point2d(1165, 501), model_path + "arnaud_front_wheel.png",
-                            Point2d(182, 494), model_path + "arnaud_back_wheel.png",
-                            Point2d(9, 469),
-                            car_width)
-        || !_cars[1].from_file(renderer, model_path + "unai.png",
-                               Point2d(1211, 502), model_path + "unai_front_wheel.png",
-                               Point2d(182, 513), model_path + "unai_back_wheel.png",
-                               Point2d(7, 484),
-                               car_width))
+    if (!_cars[0].set_textures(&_car_textures[0],
+                              Point2d(1165, 501), &_car_textures[1],
+                              Point2d(182, 494), &_car_textures[2],
+                              Point2d(9, 469))
+        || !_cars[1].set_textures(&_car_textures[3],
+                                 Point2d(1211, 502), &_car_textures[4],
+                                 Point2d(182, 513), &_car_textures[5],
+                                 Point2d(7, 484)))
       return false;
     _cars[0].set_position(Point2d(200, 200));
     _cars[1].set_position(Point2d(200, 400));
     // init fishes
+    unsigned int nfish_textures = 8;
+    _fish_textures.resize(nfish_textures);
+    int fish_size = 100; // px
+    for (unsigned int i = 0; i < nfish_textures; ++i) {
+      std::ostringstream filename;
+      filename << model_path + "fish/pez"<< i+1 << ".png";
+      _fish_textures[i].from_file(renderer, filename.str(), fish_size);
+    }
     _fishes.resize(nfishes);
     for (unsigned int var = 0; var < nfishes; ++var) {
       Fish* fish = &(_fishes[var]);
-      int fish_size = 100; // px
-      std::ostringstream filename;
-      filename << model_path + "fish/pez"<< 1+rand()%8 << ".png";
-      fish->from_file(renderer, filename.str(), fish_size);
+      fish->set_texture(&_fish_textures[rand()%nfish_textures]);
       fish->move_random_border(_winw, _winh);
     }
     return true;
@@ -357,13 +373,13 @@ public:
       _cars[i].update(_winw, _winh, &_bubble_man);
     for (unsigned int i = 0; i < _fishes.size(); ++i)
       _fishes[i].update(_winw, _winh);
-    bool ok = _candy_man.update(_winw, _winh);
+    bool ok = _candy.update(_winw, _winh);
     _bubble_man.update(_winw, _winh);
     // check candy touched by car
     for (unsigned int i = 0; i < _cars.size(); ++i) {
-      if (_cars[i].collides_with(*(_candy_man._curr_candy), 80)) {
-        printf("Collision car %i %g!\n", i, _candy_man._curr_candy->get_life_timer());
-        _candy_man.respawn(_winw, _winh);
+      if (_cars[i].collides_with(_candy._candy, 80)) {
+        printf("Collision car %i %g!\n", i, _candy._candy.get_life_timer());
+        _candy.respawn(_winw, _winh);
       }
     }
     return ok;
@@ -374,7 +390,7 @@ public:
   bool render() {
     SDL_RenderClear( renderer );
     DEBUG_PRINT("Game::render()\n");
-    bool ok = _candy_man.render(renderer);
+    bool ok = _candy.render(renderer);
     for (unsigned int i = 0; i < _cars.size(); ++i)
       ok  = ok && _cars[i].render(renderer);
     for (unsigned int i = 0; i < _fishes.size(); ++i)
@@ -393,10 +409,15 @@ protected:
   SDL_Renderer* renderer;
   std::vector<SDL_Joystick*> gameControllers;
   int _winw, _winh;
-  CandyManager _candy_man;
+  Candy _candy;
   std::vector<Car> _cars;
   std::vector<Fish> _fishes;
   BubbleManager _bubble_man;
+  // my textures
+  Texture _bubble_tex;
+  std::vector<Texture> _candy_tex;
+  std::vector<Texture> _car_textures;
+  std::vector<Texture> _fish_textures;
 }; // end Game
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -404,14 +425,20 @@ protected:
 
 int main() {
   Game game;
-  if (!game.init(800, 500))
+  if (!game.init(800, 500)) {
+    printf("game.init() failed!\n");
     return false;
+  }
   Rate rate(20);
   while (true) {
-    if (!game.update())
+    if (!game.update()){
+      printf("game.update() failed!\n");
       break;
-    if (!game.render())
+    }
+    if (!game.render()){
+      printf("game.render() failed!\n");
       break;
+    }
     rate.sleep();
   }
   return (game.clean() ? 0 : -1);
