@@ -228,12 +228,13 @@ public:
   static const double GAME_LENGTH = 15; // seconds
   static const double COUNTDOWN_LENGTH = 5; // seconds
 
-  bool init(unsigned int winw, unsigned int winh) {
+  bool init(unsigned int nplayers = 2,
+            unsigned int winw = 800, unsigned int winh = 600) {
     _game_status = GAME_STATUS_WAITING;
-    unsigned int nfishes = 15;
-    _nplayers = 2;
+    _nplayers = nplayers;
     _winw = winw;
     _winh  = winh; // pixels
+    unsigned int nfishes = 15;
 
     srand(time(NULL));
     srand48(time(NULL));
@@ -503,14 +504,14 @@ public:
           return false;
         else if (key == SDLK_r)
           _game_status = GAME_STATUS_WAITING;
-        else if (key == SDLK_UP)
-          _cars.front().advance(10);
-        else if (key == SDLK_DOWN)
-          _cars.front().advance(-10);
-        else if (key == SDLK_LEFT)
-          _cars.front().increase_angle(.1);
-        else if (key == SDLK_RIGHT)
-          _cars.front().increase_angle(-.1);
+        else if (key == SDLK_UP && !_cars.empty())
+          _cars.back().advance(10);
+        else if (key == SDLK_DOWN && !_cars.empty())
+          _cars.back().advance(-10);
+        else if (key == SDLK_LEFT && !_cars.empty())
+          _cars.back().increase_angle(.1);
+        else if (key == SDLK_RIGHT && !_cars.empty())
+          _cars.back().increase_angle(-.1);
       } // end SDL_KEYDOWN
       else if( event.type == SDL_JOYAXISMOTION ) {
         //Motion on controller 0
@@ -648,9 +649,21 @@ protected:
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 
-int main() {
+int main(int argc, char** argv) {
+  if (argc <= 1 || argc >= 3) {
+    printf("Synposis: %s nplayers [winw] [winh]\n", argv[0]);
+    printf("  nplayers: number of players, between 1 and 10\n");
+    printf("  winw:     window width  in pixels [default: 800]\n");
+    printf("  winh:     window height in pixels [default: 600]\n");
+    return -1;
+  }
+  int nplayers = atoi(argv[1]), winw = 600, winh = 600;
+  if (argc >= 3)
+    winw = atoi(argv[2]);
+  if (argc >= 4)
+    winh = atoi(argv[3]);
   Game game;
-  if (!game.init(800, 500)) {
+  if (!game.init(nplayers, winw, winh)) {
     printf("game.init() failed!\n");
     return false;
   }
