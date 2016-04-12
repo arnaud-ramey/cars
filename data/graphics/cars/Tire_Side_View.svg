@@ -1,0 +1,288 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   id="svg6840"
+   sodipodi:docname="Tire_Side_View.svg"
+   viewBox="0 0 144 144"
+   version="1.1"
+   inkscape:version="0.48.4 r9939"
+   width="100%"
+   height="100%"
+   inkscape:export-filename="Tire_Side_View.png"
+   inkscape:export-xdpi="165"
+   inkscape:export-ydpi="165">
+  <defs
+     id="defs6842">
+    <linearGradient
+       id="linearGradient6731"
+       y2="814.71"
+       gradientUnits="userSpaceOnUse"
+       x2="543.41"
+       y1="814.71"
+       x1="526.21"
+       inkscape:collect="always">
+      <stop
+         id="stop6700"
+         style="stop-color:#5e5e5e"
+         offset="0" />
+      <stop
+         id="stop6702"
+         style="stop-color:#898989"
+         offset="1" />
+    </linearGradient>
+    <radialGradient
+       id="radialGradient6733"
+       gradientUnits="userSpaceOnUse"
+       cy="814.71"
+       cx="534.81"
+       gradientTransform="matrix(1,0,0,1.0405,0,-33.029)"
+       r="8.5997"
+       inkscape:collect="always">
+      <stop
+         id="stop5588-1"
+         style="stop-color:#252525"
+         offset="0" />
+      <stop
+         id="stop6687"
+         style="stop-color:#754110"
+         offset=".20846" />
+      <stop
+         id="stop6683"
+         style="stop-color:#563e20"
+         offset=".53041" />
+      <stop
+         id="stop6685"
+         style="stop-color:#322f2d"
+         offset=".68624" />
+      <stop
+         id="stop5590-1"
+         style="stop-color:#2b2a2a"
+         offset="1" />
+    </radialGradient>
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#linearGradient6731"
+       id="linearGradient3017"
+       gradientUnits="userSpaceOnUse"
+       x1="526.21"
+       y1="814.71"
+       x2="543.41"
+       y2="814.71" />
+    <radialGradient
+       inkscape:collect="always"
+       xlink:href="#radialGradient6733"
+       id="radialGradient3019"
+       gradientUnits="userSpaceOnUse"
+       gradientTransform="matrix(1,0,0,1.0405,0,-33.029)"
+       cx="534.81"
+       cy="814.71"
+       r="8.5997" />
+  </defs>
+  <sodipodi:namedview
+     id="base"
+     bordercolor="#666666"
+     inkscape:pageshadow="2"
+     inkscape:window-y="0"
+     fit-margin-left="0"
+     pagecolor="#ffffff"
+     fit-margin-top="0"
+     inkscape:window-maximized="0"
+     inkscape:zoom="2.8284271"
+     inkscape:window-x="0"
+     inkscape:window-height="555"
+     showgrid="false"
+     borderopacity="1.0"
+     inkscape:current-layer="layer1"
+     inkscape:cx="118.01094"
+     inkscape:cy="62.183987"
+     fit-margin-right="0"
+     fit-margin-bottom="0"
+     inkscape:window-width="1024"
+     inkscape:pageopacity="0.0"
+     inkscape:document-units="px" />
+  <g
+     id="layer1"
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     transform="translate(-50.857 -577.5)">
+    <path
+       id="path3100"
+       sodipodi:rx="48.4375"
+       sodipodi:ry="48.632812"
+       style="fill:#cccccc;stroke:#000000"
+       sodipodi:type="arc"
+       d="m 591.40625,814.66687 a 48.4375,48.632812 0 1 1 -96.875,0 48.4375,48.632812 0 1 1 96.875,0 z"
+       inkscape:export-ydpi="132.03"
+       inkscape:export-filename="/home/farrer/trigger/focus_complete.png"
+       transform="matrix(1.4863644,0,0,1.4804964,-684.23429,-556.59771)"
+       sodipodi:cy="814.66687"
+       sodipodi:cx="542.96875"
+       inkscape:export-xdpi="132.03" />
+    <path
+       id="path3870"
+       sodipodi:rx="48.4375"
+       sodipodi:ry="49.709736"
+       style="fill:none;stroke:#000000"
+       sodipodi:type="arc"
+       d="m 591.40625,814.66687 a 48.4375,49.709736 0 1 1 -96.875,0 48.4375,49.709736 0 1 1 96.875,0 z"
+       inkscape:export-ydpi="132.03"
+       inkscape:export-filename="/home/farrer/trigger/focus_complete.png"
+       transform="matrix(1.1685095,0,0,1.1047097,-511.63881,-250.51109)"
+       sodipodi:cy="814.66687"
+       sodipodi:cx="542.96875"
+       inkscape:export-xdpi="132.03" />
+    <path
+       id="path6716"
+       sodipodi:rx="48.4375"
+       sodipodi:ry="49.709736"
+       style="fill:none;stroke:#000000;stroke-width:3.71079992999999986"
+       sodipodi:type="arc"
+       d="m 591.40625,814.66687 a 48.4375,49.709736 0 1 1 -96.875,0 48.4375,49.709736 0 1 1 96.875,0 z"
+       inkscape:export-ydpi="132.03"
+       inkscape:export-filename="/home/farrer/trigger/focus_complete.png"
+       transform="matrix(1.0938832,0,0,1.0341616,-471.1056,-193.03403)"
+       sodipodi:cy="814.66687"
+       sodipodi:cx="542.96875"
+       inkscape:export-xdpi="132.03" />
+    <path
+       id="path6689"
+       style="fill:none;stroke:#000000"
+       d="m 122.83388,594.56219 c -2.81291,0 -5.57811,0.20919 -8.28092,0.59368 0,0 2.36202,26.47909 -6.99976,33.27986 -9.361781,6.80097 -35.217799,-3.78117 -35.217799,-3.78117 -2.445316,4.67564 -4.203356,9.73467 -5.187323,15.06149 0,0 27.336068,6.59927 30.967944,17.78039 3.631578,11.18162 -14.249514,31.77992 -14.249514,31.77992 3.989564,3.67737 8.538808,6.78716 13.499539,9.21838 0,0 14.022523,-23.03021 25.468133,-23.03021 11.44561,0 25.46813,23.03021 25.46813,23.03021 4.96073,-2.43122 9.50997,-5.54101 13.49954,-9.21838 0,0 -17.88139,-20.5993 -14.24952,-31.77992 3.63158,-11.18162 30.96795,-17.78039 30.96795,-17.78039 -0.98399,-5.32732 -2.74201,-10.38665 -5.18732,-15.06149 0,0 -25.85612,10.58164 -35.2178,3.78117 -9.36178,-6.80097 -6.99976,-33.27986 -6.99976,-33.27986 -2.70291,-0.38449 -5.46802,-0.59368 -8.28092,-0.59368 z"
+       sodipodi:nodetypes="sczcczcczcczcczcs"
+       inkscape:connector-curvature="0" />
+    <path
+       id="path5720"
+       sodipodi:rx="48.4375"
+       sodipodi:ry="49.709736"
+       style="fill:none;stroke:#000000;stroke-width:3.71079992999999986"
+       sodipodi:type="arc"
+       d="m 591.40625,814.66687 a 48.4375,49.709736 0 1 1 -96.875,0 48.4375,49.709736 0 1 1 96.875,0 z"
+       inkscape:export-ydpi="132.03"
+       inkscape:export-filename="/home/farrer/trigger/focus_complete.png"
+       sodipodi:cy="814.66687"
+       transform="matrix(1.1685095,0,0,1.1047097,-511.63881,-250.51109)"
+       inkscape:export-xdpi="132.03"
+       sodipodi:cx="542.96875" />
+    <path
+       id="path6694"
+       sodipodi:rx="8.5997372"
+       sodipodi:ry="8.9483757"
+       style="fill:none;stroke:#000000"
+       sodipodi:type="arc"
+       d="m 543.41047,814.70728 a 8.5997372,8.9483757 0 1 1 -17.19948,0 8.5997372,8.9483757 0 1 1 17.19948,0 z"
+       transform="matrix(2.0560005,0,0,2.0388366,-976.75116,-1011.6494)"
+       sodipodi:cy="814.70728"
+       sodipodi:cx="534.81073" />
+    <path
+       id="path6083"
+       sodipodi:rx="8.5997372"
+       sodipodi:ry="8.9483757"
+       style="fill:none;stroke:#000000"
+       sodipodi:type="arc"
+       d="m 543.41047,814.70728 a 8.5997372,8.9483757 0 1 1 -17.19948,0 8.5997372,8.9483757 0 1 1 17.19948,0 z"
+       transform="matrix(1.4599144,0,0,1.4477676,-657.94081,-530.03327)"
+       sodipodi:cy="814.70728"
+       sodipodi:cx="534.81073" />
+    <path
+       id="path6706"
+       sodipodi:rx="4"
+       sodipodi:ry="4"
+       style="fill:#ffffff;stroke:#000000"
+       sodipodi:type="arc"
+       d="m 764,1084 a 4,4 0 1 1 -8,0 4,4 0 1 1 8,0 z"
+       transform="matrix(0.99996588,0,0,0.99996588,-624.14011,-447.49985)"
+       sodipodi:cy="1084"
+       sodipodi:cx="760" />
+    <path
+       id="path6710"
+       sodipodi:rx="4"
+       sodipodi:ry="4"
+       style="fill:#ffffff;stroke:#000000"
+       sodipodi:type="arc"
+       d="m 764,1084 a 4,4 0 1 1 -8,0 4,4 0 1 1 8,0 z"
+       transform="matrix(0.99996588,0,0,0.99996588,-651.1398,-447.49985)"
+       sodipodi:cy="1084"
+       sodipodi:cx="760" />
+    <path
+       id="path6712"
+       sodipodi:rx="4"
+       sodipodi:ry="4"
+       style="fill:#ffffff;stroke:#000000"
+       sodipodi:type="arc"
+       d="m 764,1084 a 4,4 0 1 1 -8,0 4,4 0 1 1 8,0 z"
+       transform="matrix(0.99996588,0,0,0.99996588,-624.14011,-421.50461)"
+       sodipodi:cy="1084"
+       sodipodi:cx="760" />
+    <path
+       id="path6714"
+       sodipodi:rx="4"
+       sodipodi:ry="4"
+       style="fill:#ffffff;stroke:#000000"
+       sodipodi:type="arc"
+       d="m 764,1084 a 4,4 0 1 1 -8,0 4,4 0 1 1 8,0 z"
+       transform="matrix(0.99996588,0,0,0.99996588,-651.1398,-421.50461)"
+       sodipodi:cy="1084"
+       sodipodi:cx="760" />
+  </g>
+  <metadata
+     id="metadata28">
+    <rdf:RDF>
+      <cc:Work>
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <cc:license
+           rdf:resource="http://creativecommons.org/licenses/publicdomain/" />
+        <dc:publisher>
+          <cc:Agent
+             rdf:about="http://openclipart.org/">
+            <dc:title>Openclipart</dc:title>
+          </cc:Agent>
+        </dc:publisher>
+        <dc:title>Simple Car Wheel/Tire Side View</dc:title>
+        <dc:date>2012-07-15T22:39:38</dc:date>
+        <dc:description>Just a wheel side view made for Trigger Rally. I quite like it, hope you do too!</dc:description>
+        <dc:source>https://openclipart.org/detail/171197/cars-wheel-by-qubodup-171197</dc:source>
+        <dc:creator>
+          <cc:Agent>
+            <dc:title>qubodup</dc:title>
+          </cc:Agent>
+        </dc:creator>
+        <dc:subject>
+          <rdf:Bag>
+            <rdf:li>car</rdf:li>
+            <rdf:li>cars</rdf:li>
+            <rdf:li>rim</rdf:li>
+            <rdf:li>rims</rdf:li>
+            <rdf:li>tire</rdf:li>
+            <rdf:li>tires</rdf:li>
+            <rdf:li>transport</rdf:li>
+            <rdf:li>travel</rdf:li>
+            <rdf:li>vehicle</rdf:li>
+            <rdf:li>vehicles</rdf:li>
+            <rdf:li>wheel</rdf:li>
+            <rdf:li>wheels</rdf:li>
+          </rdf:Bag>
+        </dc:subject>
+      </cc:Work>
+      <cc:License
+         rdf:about="http://creativecommons.org/licenses/publicdomain/">
+        <cc:permits
+           rdf:resource="http://creativecommons.org/ns#Reproduction" />
+        <cc:permits
+           rdf:resource="http://creativecommons.org/ns#Distribution" />
+        <cc:permits
+           rdf:resource="http://creativecommons.org/ns#DerivativeWorks" />
+      </cc:License>
+    </rdf:RDF>
+  </metadata>
+</svg>

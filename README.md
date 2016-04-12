@@ -27,6 +27,15 @@ Fonts
 Graphics
 --------
 
+  - `graphics/cars/Tire_Side_View.svg`:
+    [openclipart.org](https://openclipart.org/detail/171197/simple-car-wheeltire-side-view)
+
+  - `graphics/cars/BlackCabrio.svg`:
+    [openclipart.org](https://openclipart.org/detail/170838/black-cabrio-side-view)
+
+  - `graphics/cars/2cv.svg`:
+    [openclipart.org](https://openclipart.org/detail/202003/2cv)
+
   - `graphics/candy/*, graphics/cars/*, graphics/fish/*`:
     homemade
 

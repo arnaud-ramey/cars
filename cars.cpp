@@ -38,19 +38,23 @@ public:
     }
     set_position(Point2d(x, y));
     increase_angle(angle);
-    set_tan_nor_speed(Point2d(20 + rand() % 150, 0));
+    _tan_speed = 20 + rand() % 150;
+    _nor_speed = rand() % 10;
+    _oscil_period = drand48() * 5;
   }
 
   //////////////////////////////////////////////////////////////////////////////
 
   void update(int winw, int winh) {
-    //double speedx = cos(3*get_life_timer()); set_angspeed(speedx);
+    set_tan_nor_speed(Point2d( _tan_speed, _nor_speed * cos(_oscil_period*get_life_timer()) ));
+    rotate_towards_speed_direction();
     if (!is_visible(winw, winh))
       move_random_border(winw, winh);
     Entity::update_pos_speed();
   }
 
 protected:
+  double _tan_speed, _nor_speed, _oscil_period;
 }; // end class Fish
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -126,12 +130,12 @@ public:
   void update(int winw, int winh, BubbleManager* bubble_gen) {
     // orientate car in direction of speed
     if (_speed.norm() > 10)
-      _angle = atan2(_speed.y, _speed.x);
+      rotate_towards_speed_direction();
     // turn wheels faster if car faster
     double wheel_speed = hypot(_speed.y, _speed.x) / 10;
+    Entity::update_pos_speed();
     for (int i = 0; i < _children.size(); ++i)
       _children[i].second.set_angspeed(wheel_speed);
-    Entity::update_pos_speed();
     // stop if going out of the screen
     if (_position.x < _tex_radius) { // left
       _accel.x = std::max(_accel.x + 10, 20.);
@@ -228,10 +232,10 @@ public:
   static const double GAME_LENGTH = 15; // seconds
   static const double COUNTDOWN_LENGTH = 5; // seconds
 
-  bool init(unsigned int nplayers = 2,
-            unsigned int winw = 800, unsigned int winh = 600) {
+  bool init(unsigned int winw, unsigned int winh,
+            const std::vector<std::string> & player_names) {
     _game_status = GAME_STATUS_WAITING;
-    _nplayers = nplayers;
+    _nplayers = player_names.size();
     _winw = winw;
     _winh  = winh; // pixels
     unsigned int nfishes = 15;
@@ -349,35 +353,46 @@ public:
     _cup_textures[0].from_file(renderer, graphics_path + "cup_gold.png", cup_width);
     _cup_textures[1].from_file(renderer, graphics_path + "cup_silver.png", cup_width);
     _cup_textures[2].from_file(renderer, graphics_path + "cup_bronze.png", cup_width);
-    _car_textures.resize(7);
-    _car_textures[0].from_file(renderer, graphics_path + "cars/arnaud.png", car_width);
-    _car_textures[1].from_file(renderer, graphics_path + "cars/arnaud_front_wheel.png",
-                               -1, -1, _car_textures[0].get_resize_scale());
-    _car_textures[2].from_file(renderer, graphics_path + "cars/arnaud_back_wheel.png",
-                               -1, -1, _car_textures[0].get_resize_scale());
-    _car_textures[3].from_file(renderer, graphics_path + "cars/unai.png", car_width);
-    _car_textures[4].from_file(renderer, graphics_path + "cars/unai_front_wheel.png",
-                               -1, -1, _car_textures[3].get_resize_scale());
-    _car_textures[5].from_file(renderer, graphics_path + "cars/unai_back_wheel.png",
-                               -1, -1, _car_textures[3].get_resize_scale());
-    _car_textures[6].from_file(renderer, graphics_path + "cars/ainara.png", car_width);
+    _car_textures.resize(3 * _nplayers);
     _cars.resize(_nplayers);
     for (int i = 0; i < _nplayers; ++i) {
-      if (i == 0  && !_cars[i].set_textures(&_car_textures[0],
-                                            Point2d(1165, 501), &_car_textures[1],
-                                            Point2d(182, 494), &_car_textures[2],
-                                            Point2d(9, 469)) )
+      Point2d fw, bw, e;
+      std::string pname = player_names[i];
+      if (pname == "2cv") {
+        fw = Point2d(580, 241);
+        bw = Point2d(140, 244);
+        e = Point2d(6, 226);
+      }
+      else if (pname == "cabrio") {
+        fw = Point2d(131, 196);
+        bw = Point2d(670, 196);
+        e = Point2d(26, 204);
+      }
+      else if (pname == "twingo_ainara" || pname == "twingo_arnaud") {
+        fw = Point2d(1165, 501);
+        bw = Point2d(182, 494);
+        e = Point2d(9, 469);
+      }
+      else if (pname == "twingo_red" || pname == "twingo_unai") {
+        fw = Point2d(1211, 502);
+        bw = Point2d(182, 513);
+        e = Point2d(7, 484);
+      }
+      else {
+        printf("Unknown car '%s'\n", pname.c_str());
         return false;
-      else if (i == 1  && !_cars[i].set_textures(&_car_textures[3],
-                                                 Point2d(1211, 502), &_car_textures[4],
-                                                 Point2d(182, 513), &_car_textures[5],
-                                                 Point2d(7, 484)))
-        return false;
-      // default car
-      else if (i >= 2 && !_cars[i].set_textures(&_car_textures[6],
-                                                Point2d(1165, 501), &_car_textures[1],
-                                                Point2d(182, 494), &_car_textures[2],
-                                                Point2d(9, 469)))
+      }
+      std::ostringstream carfile;
+      carfile << graphics_path << "cars/" << pname;
+      bool ok = true;
+      ok = ok && _car_textures[3*i].from_file(renderer, carfile.str() + ".png", car_width);
+      ok = ok && _car_textures[3*i+1].from_file(renderer, carfile.str() + "_front_wheel.png",
+                                                -1, -1, _car_textures[3*i].get_resize_scale());
+      ok = ok && _car_textures[3*i+2].from_file(renderer, carfile.str() + "_back_wheel.png",
+                                                -1, -1, _car_textures[3*i].get_resize_scale());
+      ok = ok && _cars[i].set_textures(&_car_textures[3*i],
+          fw, &_car_textures[3*i+1], bw, &_car_textures[3*i+2], e);
+      if (!ok)
         return false;
       _cars[i].set_position(Point2d(200, (i+1) * winh / (_nplayers+1)));
     }
@@ -504,14 +519,16 @@ public:
           return false;
         else if (key == SDLK_r)
           _game_status = GAME_STATUS_WAITING;
-        else if (key == SDLK_UP && !_cars.empty())
-          _cars.back().advance(10);
-        else if (key == SDLK_DOWN && !_cars.empty())
-          _cars.back().advance(-10);
-        else if (key == SDLK_LEFT && !_cars.empty())
-          _cars.back().increase_angle(.1);
-        else if (key == SDLK_RIGHT && !_cars.empty())
-          _cars.back().increase_angle(-.1);
+        else if ((key == SDLK_UP || key == SDLK_DOWN) && !_cars.empty()) {
+          _cars.back().set_accel(Point2d());
+          _cars.back().set_speed(Point2d());
+          _cars.back().advance( (key == SDLK_UP ? 10 : -10));
+        }
+        else if ((key == SDLK_LEFT || key == SDLK_RIGHT) && !_cars.empty()) {
+          _cars.back().set_accel(Point2d());
+          _cars.back().set_speed(Point2d());
+          _cars.back().increase_angle( (key == SDLK_LEFT ? .1 : -.1));
+        }
       } // end SDL_KEYDOWN
       else if( event.type == SDL_JOYAXISMOTION ) {
         //Motion on controller 0
@@ -558,10 +575,10 @@ public:
     for (unsigned int i = 0; i < _nplayers; ++i) {
       int cell = _winw / (_nplayers+1), x = cell * (i+1);
       ok = ok && _cars[i].get_texture()->render_center(renderer, Point2d(x, 30), .5);
-      ok = ok && _score_textures[i].render_center(renderer, Point2d(x + 70, 30));
+      ok = ok && _score_textures[i].render_center(renderer, Point2d(x, 70));
       int rank = _cars[i].rank; // render rank cup if needed
       if (rank >= 0 && rank < 3)
-        ok = ok && _cup_textures[rank].render_center(renderer, Point2d(x - 60, 30), .5);
+        ok = ok && _cup_textures[rank].render_center(renderer, Point2d(x - 30, 70), .5);
     }
     // render time
     // refresh time if needed
@@ -650,20 +667,29 @@ protected:
 ////////////////////////////////////////////////////////////////////////////////
 
 int main(int argc, char** argv) {
-  if (argc <= 1 || argc >= 5) {
-    printf("Synposis: %s nplayers [winw] [winh]\n", argv[0]);
-    printf("  nplayers: number of players, between 1 and 10\n");
+  if (argc == 2) {
+    printf("Synposis: %s winw winh [players_names]\n", argv[0]);
     printf("  winw:     window width  in pixels [default: 800]\n");
     printf("  winh:     window height in pixels [default: 600]\n");
+    printf("  player_names: names of players, between 1 and 10\n");
+    printf("    possible choices: 2cv  cabrio  twingo_ainara  twingo_arnaud  twingo_red  twingo_unai\n");
+    printf("    default: \"twingo_arnaud twingo_unai\"\n");
     return -1;
   }
-  int nplayers = atoi(argv[1]), winw = 600, winh = 600;
-  if (argc >= 3)
-    winw = atoi(argv[2]);
-  if (argc >= 4)
-    winh = atoi(argv[3]);
+  std::vector<std::string> player_names;
+  int winw = 600, winh = 600;
+  if (argc >= 3) {
+    winw = atoi(argv[1]);
+    winh = atoi(argv[2]);
+  }
+  if (argc < 4) { // exename winw winh p1
+    player_names.push_back("twingo_arnaud");
+    player_names.push_back("twingo_unai");
+  }
+  for (int argi = 3; argi < argc; ++argi)
+    player_names.push_back(argv[argi]);
   Game game;
-  if (!game.init(nplayers, winw, winh)) {
+  if (!game.init(winw, winh, player_names)) {
     printf("game.init() failed!\n");
     return false;
   }

@@ -613,10 +613,15 @@ public:
   void set_position(const Point2d & position)   {
     _compute_tight_bbox_needed = true;
     _position = position;
+    update_children_positions();
   }
   Point2d get_position() const                  { return  _position; }
   void advance(const double & dist) {
     set_position(_position + rotate(Point2d(dist, 0), _angle));
+  }
+  void rotate_towards_speed_direction() {
+    if (fabs(_speed.y)>1E-2)
+      _angle = atan2(_speed.y, _speed.x);
   }
   void update_pos_speed() {
     Timer::Time time = _update_timer.getTimeSeconds();
@@ -625,11 +630,9 @@ public:
     _speed += time * _accel;
     _position += time * _speed;
     // update children
-    for (int i = 0; i < _children.size(); ++i) {
+    for (int i = 0; i < _children.size(); ++i)
       _children[i].second.update_pos_speed();
-      // restore joint position
-      _children[i].second.set_position( offset2world_pos( _children[i].first ) );
-    }
+    update_children_positions();
     _update_timer.reset();
   }
 
@@ -757,6 +760,11 @@ public:
   }
 
 protected:
+  void update_children_positions() {
+    for (int i = 0; i < _children.size(); ++i)
+      _children[i].second.set_position( offset2world_pos( _children[i].first ) );
+  }
+
   Timer _life_timer, _update_timer;
   Point2d _position, _accel, _speed;
   double _angle, _angspeed;
