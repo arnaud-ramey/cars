@@ -229,7 +229,7 @@ public:
 
 class Game {
 public:
-  static const double GAME_LENGTH = 15; // seconds
+  static const double GAME_LENGTH = 45; // seconds
   static const double COUNTDOWN_LENGTH = 5; // seconds
 
   bool init(unsigned int winw, unsigned int winh,
