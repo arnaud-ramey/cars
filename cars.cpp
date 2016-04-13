@@ -134,7 +134,7 @@ public:
     // turn wheels faster if car faster
     double wheel_speed = hypot(_speed.y, _speed.x) / 10;
     Entity::update_pos_speed();
-    for (int i = 0; i < _children.size(); ++i)
+    for (unsigned int i = 0; i < _children.size(); ++i)
       _children[i].second.set_angspeed(wheel_speed);
     // stop if going out of the screen
     if (_position.x < _tex_radius) { // left
@@ -201,7 +201,7 @@ public:
       if ((get_position() - old_pos).norm() < winw / 3)
         continue;
       // check far from players
-      for (int i = 0; i < cars.size(); ++i) {
+      for (unsigned int i = 0; i < cars.size(); ++i) {
         if ((get_position() - cars[i].get_position()).norm() >= winw / 3)
           continue; // far enough from player i
         ok = false;
@@ -281,7 +281,7 @@ public:
     SDL_SetRenderDrawColor( renderer, 150, 150, 255, 255 );
     //Check for joysticks
     gameControllers.resize(SDL_NumJoysticks());
-    for (unsigned int i = 0; i < SDL_NumJoysticks(); ++i) {
+    for (int i = 0; i < SDL_NumJoysticks(); ++i) {
       gameControllers[i] = SDL_JoystickOpen( i );
       if(gameControllers[i] == NULL )
         printf( "Warning: Unable to open game controller! SDL Error: %s\n", SDL_GetError() );
@@ -344,7 +344,7 @@ public:
     _candy_textures[1].from_file(renderer, graphics_path + "candy/chuche2.png", 50);
     _candy_textures[2].from_file(renderer, graphics_path + "candy/huevo.png", 80);
     std::vector<Texture*> candy_texture_ptrs;
-    for (int i = 0; i < _candy_textures.size(); ++i)
+    for (unsigned int i = 0; i < _candy_textures.size(); ++i)
       candy_texture_ptrs.push_back(&_candy_textures[i]);
     _candy.set_textures(candy_texture_ptrs);
     // init cars
@@ -355,7 +355,7 @@ public:
     _cup_textures[2].from_file(renderer, graphics_path + "cup_bronze.png", cup_width);
     _car_textures.resize(3 * _nplayers);
     _cars.resize(_nplayers);
-    for (int i = 0; i < _nplayers; ++i) {
+    for (unsigned int i = 0; i < _nplayers; ++i) {
       Point2d fw, bw, e;
       std::string pname = player_names[i];
       if (pname == "2cv") {
@@ -455,7 +455,7 @@ public:
       _candy.move_far_away();
       Mix_HaltMusic();
       // reset ranks and scores
-      for (int i = 0; i < _nplayers; ++i) {
+      for (unsigned int i = 0; i < _nplayers; ++i) {
         _cars[i].rank = -1;
         _scores[i] = 0;
         if (!_score_textures[i].loadFromRenderedText(renderer, _score_font, "0", 255, 0, 0))
@@ -532,7 +532,7 @@ public:
       } // end SDL_KEYDOWN
       else if( event.type == SDL_JOYAXISMOTION ) {
         //Motion on controller 0
-        if( event.jaxis.which <= _nplayers ) {
+        if( event.jaxis.which <= (int) _nplayers ) {
           Car* car = &(_cars[event.jaxis.which]);
 #if 1 // control car accelerations
           Point2d accel = car->get_accel();
@@ -612,11 +612,11 @@ protected:
     std::vector<int> scores_sorted = _scores;
     std::sort(scores_sorted.begin(), scores_sorted.end(), std::greater<int>());
     for (int rank = 2; rank >= 0; --rank) {
-      for (int i = 0; i < _nplayers; ++i) {
+      for (unsigned int i = 0; i < _nplayers; ++i) {
         if (_scores[i] == scores_sorted[rank])
           _cars[i].rank = rank;
-      }
-    }
+      } // end for i
+    } // end for rannk
   } // end podium()
 
   //! \return true if render OK or already done
@@ -631,7 +631,8 @@ protected:
 
   SDL_Window* window;
   SDL_Renderer* renderer;
-  int _winw, _winh, _nplayers;
+  int _winw, _winh;
+  unsigned int _nplayers;
   Timer _game_timer;
   GameStatus _game_status;
   // joystick stuff

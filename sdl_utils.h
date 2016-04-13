@@ -130,6 +130,7 @@ public:
     SDL_Point ans;
     ans.x = x;
     ans.y = y;
+    return ans;
   }
   //implicit conversion
   operator SDL_Point() const { return to_sdl(); }
@@ -211,8 +212,8 @@ bool IsPolygonsIntersecting(const std::vector<Point2d> & A,
                             const std::vector<Point2d> & B,
                             bool reverse_already_checked = false) {
   unsigned int sA =A.size(), sB = B.size();
-  for (int i1 = 0; i1 <sA; i1++) {
-    int i2 = (i1 + 1) %sA;
+  for (unsigned int i1 = 0; i1 <sA; i1++) {
+    unsigned int i2 = (i1 + 1) %sA;
     Point2d p1 = A[i1], p2 = A[i2];
     Point2d normal(p2.y - p1.y, p1.x - p2.x);
 
@@ -338,7 +339,9 @@ void render_point(SDL_Renderer* renderer, Point2d p, int thickness,
   Uint8 r0, g0, b0, a0; // get original colors of the renderer
   SDL_GetRenderDrawColor( renderer, &r0, &g0, &b0, &a0 );
   SDL_SetRenderDrawColor( renderer, r, g, b, a );
-  SDL_Rect fillRect = { p.x-thickness/2, p.y-thickness/2, thickness, thickness };
+  SDL_Rect fillRect = { (int) (p.x-thickness/2),
+                        (int) (p.y-thickness/2),
+                        thickness, thickness };
   SDL_RenderFillRect( renderer, &fillRect );
   SDL_SetRenderDrawColor( renderer, r0, g0, b0, a0 );
 }
@@ -493,8 +496,8 @@ public:
   bool loadFromRenderedText(SDL_Renderer* renderer,
                             TTF_Font *font,
                             std::string textureText,
-                            int r, int g, int b, int a = 255,
-                            int bgr = 0, int bgg = 0, int bgb = 0, int bga = 0) {
+                            Uint8 r, Uint8 g, Uint8 b, Uint8 a = 255,
+                            Uint8 bgr = 0, Uint8 bgg = 0, Uint8 bgb = 0, Uint8 bga = 0) {
     //Get rid of preexisting texture
     free();
     //Render text surface
@@ -527,7 +530,9 @@ public:
                double angle_rad = 0, Point2d center = Point2d(-1, -1),
                SDL_RendererFlip flip = SDL_FLIP_NONE) const {
     //Set rendering space and render to screen
-    SDL_Rect renderQuad = { p.x, p.y, scale * _width, scale * _height };
+    SDL_Rect renderQuad = { (int) p.x, (int) p.y,
+                            (int) (scale * _width),
+                            (int) (scale * _height) };
 
     //Set clip rendering dimensions
     if( clip != NULL ) {
@@ -630,7 +635,7 @@ public:
     _speed += time * _accel;
     _position += time * _speed;
     // update children
-    for (int i = 0; i < _children.size(); ++i)
+    for (unsigned int i = 0; i < _children.size(); ++i)
       _children[i].second.update_pos_speed();
     update_children_positions();
     _update_timer.reset();
@@ -681,7 +686,7 @@ public:
       return false;
     }
     bool ok = true;
-    for (int i = 0; i < _children.size(); ++i)
+    for (unsigned int i = 0; i < _children.size(); ++i)
       ok = ok && _children[i].second.render(renderer);
 #if DEBUG
     //render_point(renderer, _position, 3, 255, 0, 0, 255);
@@ -761,7 +766,7 @@ public:
 
 protected:
   void update_children_positions() {
-    for (int i = 0; i < _children.size(); ++i)
+    for (unsigned int i = 0; i < _children.size(); ++i)
       _children[i].second.set_position( offset2world_pos( _children[i].first ) );
   }
 
