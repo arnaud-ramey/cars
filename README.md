@@ -54,30 +54,24 @@ Fonts
 
   - `fonts/DejaVuSans-Bold.ttf`:
     included in Ubuntu.
-
-  - `fonts/LCD2U___.TTF`:    [myfontfree.com](http://www.myfontfree.com/lcd2-myfontfreecom55f70418.htm)
+  - `fonts/LCD2U___.TTF`:
+    [myfontfree.com](http://www.myfontfree.com/lcd2-myfontfreecom55f70418.htm)
 
 Graphics
 --------
 
   - `graphics/bubble.png`:
     [openclipart.org](https://openclipart.org/detail/195743/bubble)
-
   - `graphics/candy/*, graphics/fish/*`:
     homemade
-
   - `graphics/cars/2cv*:
     [openclipart.org](https://openclipart.org/detail/202003/2cv)
-
   - `graphics/cars/cabrio*`:
     [openclipart.org](https://openclipart.org/detail/170838/black-cabrio-side-view)
-
   - `graphics/cars/Tire_Side_View.*`:
     [openclipart.org](https://openclipart.org/detail/171197/simple-car-wheeltire-side-view)
-
   - `graphics/cars/twingo*`:
     homemade
-
   - `graphics/cup_*.png`:
     [supertuxkart.sourceforge.net](http://supertuxkart.sourceforge.net/)
 
@@ -86,7 +80,6 @@ Music
 
   - `music/cocoa_river.ogg`:
     [supertuxkart.sourceforge.net](http://supertuxkart.sourceforge.net/)
-
   - `music/unai_arnaud.flac`:
     homemade
 

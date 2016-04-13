@@ -1,5 +1,5 @@
 /*!
-  \file
+  \file        sdl_utis.h
   \author      Arnaud Ramey <arnaud.a.ramey@gmail.com>
                 -- Robotics Lab, University Carlos III of Madrid
   \date        2016/4/9
@@ -415,6 +415,7 @@ inline bool render_arrow
   pt_end.y  = pt2.y + side_strokes_length * sin(arrow_orien + M_PI - M_PI / 6);
   if (!render_line(renderer, pt2, pt_end, r, g, b, a, thickness))
     return false;
+  return true;
 } // end draw_arrow();
 
 ////////////////////////////////////////////////////////////////////////////////

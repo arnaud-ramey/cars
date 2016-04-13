@@ -240,8 +240,6 @@ public:
     _winh  = winh; // pixels
     unsigned int nfishes = 15;
 
-    srand(time(NULL));
-    srand48(time(NULL));
     if ( SDL_Init( SDL_INIT_EVERYTHING ) == -1 ) {
       std::cout << " Failed to initialize SDL : " << SDL_GetError() << std::endl;
       return false;
@@ -311,7 +309,6 @@ public:
       printf( "Failed to load font! SDL_ttf Error: %s\n", TTF_GetError() );
       return false;
     }
-    std::ostringstream GAME_LENGTH_str; GAME_LENGTH_str << GAME_LENGTH;
     _last_renderer_time = -1;
     // load music and sounds
     // WAVE, MOD, MIDI, OGG, MP3, FLAC
@@ -668,6 +665,8 @@ protected:
 ////////////////////////////////////////////////////////////////////////////////
 
 int main(int argc, char** argv) {
+  srand(time(NULL));
+  srand48(time(NULL));
   if (argc == 2) {
     printf("Synposis: %s winw winh [players_names]\n", argv[0]);
     printf("  winw:     window width  in pixels [default: 800]\n");
