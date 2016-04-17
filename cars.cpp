@@ -170,7 +170,7 @@ protected:
 
 class Candy : public Entity {
 public:
-  Candy() {
+  Candy() : _tex_idx(-1) {
     _need_respawn = true;
   }
 

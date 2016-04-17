@@ -592,7 +592,7 @@ public:
   Entity() {
     _tex_ptr = NULL;
     _bbox_offset.resize(4);
-    _tex_radius = _angle = _angspeed = 0;
+    _tex_radius = _entity_radius = _angle = _angspeed = 0;
     _rendering_scale  = 1;
     _compute_tight_bbox_needed = true;
     _collision_pt = Point2d(-1, -1);
