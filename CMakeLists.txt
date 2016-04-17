@@ -13,5 +13,5 @@ include_directories(${SDL2_INCLUDE_DIR})
 # sudo apt-get install libsdl2-gfx-dev libsdl2-image-dev  libsdl2-mixer-dev  libsdl2-ttf-dev
 ADD_EXECUTABLE(cars cars.cpp timer.h sdl_utils.h)
 TARGET_LINK_LIBRARIES(cars ${SDL2_LIBRARY}
-                            SDL2_image SDL2_mixer SDL2_ttf)
+                            SDL2_gfx SDL2_image SDL2_mixer SDL2_ttf)
 
