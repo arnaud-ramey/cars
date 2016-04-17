@@ -8,11 +8,11 @@ before_install:
   - sudo apt-get -qq update
   - sudo apt-get install -y libsdl2-image-dev  libsdl2-mixer-dev  libsdl2-ttf-dev
   # install SDL2-gfx based on https://github.com/hmgle/led_fan/blob/master/.travis.yml
- - curl -O http://www.ferzkopp.net/Software/SDL2_gfx/SDL2_gfx-1.0.1.tar.gz
- - tar xf SDL2_gfx-1.0.1.tar.gz
- - cd SDL2_gfx-1.0.1 && ./autogen.sh && ./configure
- - make && sudo make install
- - cd ..
+  - curl -O http://www.ferzkopp.net/Software/SDL2_gfx/SDL2_gfx-1.0.1.tar.gz
+  - tar xf SDL2_gfx-1.0.1.tar.gz
+  - cd SDL2_gfx-1.0.1 && ./autogen.sh && ./configure
+  - make && sudo make install
+  - cd ..
 
 script:
   - mkdir build
