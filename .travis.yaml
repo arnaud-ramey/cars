@@ -1,0 +1,16 @@
+# Enable C++ support
+language: cpp
+# Compiler selection
+compiler:
+  - clang
+  - gcc
+
+before_install:
+  - sudo apt-get -qq update
+  - sudo apt-get install -y libsdl2-gfx-dev libsdl2-image-dev  libsdl2-mixer-dev  libsdl2-ttf-dev
+
+script:
+  - mkdir build
+  - cd build
+  - cmake ..
+  - make
