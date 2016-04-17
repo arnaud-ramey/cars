@@ -1,5 +1,7 @@
 # cars
 
+[![Build Status](https://travis-ci.org/arnaud-ramey/cars.svg)](https://travis-ci.org/arnaud-ramey/cars)
+
 ![First capture](doc/game_xs.png)
 ![Second capture](doc/win_xs.png)
 
