@@ -1,12 +1,13 @@
-# https://github.com/JIghtuse/cavestory-sdl2/blob/master/.travis.yml
+# travis rules for cars
 language: cpp
 compiler:
   - gcc
 
 before_install:
-  - sudo apt-add-repository --yes ppa:zoogie/sdl2-snapshots       # libsdl2
+  # intall libsdl2 from PPA
+  - sudo apt-add-repository --yes ppa:zoogie/sdl2-snapshots
   - sudo apt-get -qq update
-  - sudo apt-get install -y libsdl2-image-dev  libsdl2-mixer-dev  libsdl2-ttf-dev
+  - sudo apt-get install -y  libsdl2-image-dev  libsdl2-mixer-dev  libsdl2-ttf-dev
   # install SDL2-gfx based on https://github.com/hmgle/led_fan/blob/master/.travis.yml
   - curl -O http://www.ferzkopp.net/Software/SDL2_gfx/SDL2_gfx-1.0.1.tar.gz
   - tar xf SDL2_gfx-1.0.1.tar.gz
@@ -14,7 +15,7 @@ before_install:
   - make && sudo make install
   - cd ..
 
-script:
+script: # compile
   - mkdir build
   - cd build
   - cmake ..
